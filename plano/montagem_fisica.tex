@@ -5,7 +5,8 @@
 % Da bancada com todas as peças em mãos até o pêndulo montado, ligado e
 % conferido, pronto para as etapas 5 a 8 de docs/testes_bancada.md.
 %
-% Figuras: ./cad/etapas_montagem.sh   (gera plano/figuras/)
+% Figuras do CAD: ./cad/etapas_montagem.sh   (gera plano/figuras/)
+% Desenhos (TikZ): plano/ilustracoes.tex
 % Compilar: cd plano && latexmk -pdf montagem_fisica.tex
 % =====================================================================
 \documentclass[11pt,a4paper]{article}
@@ -17,7 +18,7 @@
 \usepackage[a4paper,top=2.4cm,bottom=2.2cm,left=2cm,right=2cm,headheight=14pt]{geometry}
 \usepackage{microtype}
 \DisableLigatures[-]{encoding=*, family=tt*}
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,textcomp}
 \usepackage{siunitx}
 \usepackage[table]{xcolor}
 \usepackage{booktabs,array,tabularx,xltabular}
@@ -29,7 +30,8 @@
 \usepackage{multicol}
 \usepackage{enumitem}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,calc,fit}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,patterns}
+\usepackage[european]{circuitikz}
 \usepackage[skins,breakable]{tcolorbox}
 \usepackage{fancyhdr}
 \usepackage{needspace}
@@ -137,6 +139,13 @@
   \begin{minipage}[b]{0.48\linewidth}\centering\includegraphics[height=#3]{#2}\\
     {\footnotesize\color{cinza}#5}\end{minipage}
   \end{center}}
+% figura numerada dentro de uma tarefa: \figil{conteúdo}{legenda}{rótulo}
+\newcommand{\figil}[3]{%
+  \begin{center}#1\par\captionof{figure}{#2}\label{#3}\end{center}}
+% o que a tarefa deixa pronto, logo abaixo do título
+\newcommand{\objetivo}[1]{{\color{azul!70!black}\textbf{Objetivo:} #1}\par\smallskip}
+
+\input{ilustracoes}
 
 \hypersetup{pdftitle={Guia de montagem física - pêndulo com roda de reação},
   pdfauthor={}}
@@ -187,7 +196,7 @@ telemetria).
 
 \paragraph{Ponto de chegada.} Pêndulo montado na base, eletrônica na bandeja, firmware
 gravado, sensores conferidos (MPU6050, encoder óptico, tensão do barramento), motor
-girando nos dois sentidos, botão de emergência testado e massas medidas no modelo. Daí em
+girando nos dois sentidos e massas medidas no modelo. Daí em
 diante seguem as identificações e o primeiro equilíbrio (etapas~5 a~8 de
 \arq{docs/testes_bancada.md}, fase~7 do \arq{plano/plano_execucao.pdf}).
 
@@ -262,7 +271,7 @@ figura~\ref{fig:fluxo}. Com 5 pessoas, a montagem toma \textbf{cerca de um dia d
   \node[i, below=9mm of m10.south east, anchor=north] (i1) {\textbf{I1} eletrônica na bandeja};
   \node[i, below=of i1] (i2) {\textbf{I2} conferência antes de ligar};
   \node[i, below=of i2] (i3) {\textbf{I3} energização e sensores};
-  \node[i, right=5mm of i1] (i4) {\textbf{I4} motor e emergência};
+  \node[i, right=5mm of i1] (i4) {\textbf{I4} motor sem roda};
   \node[i, below=of i4] (i5) {\textbf{I5} proteção e aceite};
   \node[i, below=of i5] (i6) {\textbf{I6} massas no modelo};
   % setas
@@ -292,7 +301,13 @@ Cada tarefa vem numa caixa. A cor da faixa diz a trilha (azul: mecânica; laranj
 roxo: integração). Embaixo do título estão quantas pessoas, quanto tempo e o que precisa
 estar pronto antes. Os passos vêm numerados na ordem certa. \textbf{Aceite} é a condição
 que encerra a tarefa; \textbf{se falhar} diz a primeira providência. \caixa{} marca um item
-para riscar no papel.
+para riscar no papel. Toda tarefa começa pelo \textbf{objetivo}: o que fica pronto e por quê.
+
+As figuras dentro das tarefas são de dois tipos. As \textbf{vistas do CAD} mostram as peças
+como elas são: nas vistas explodidas as peças aparecem afastadas, e as \textbf{setas
+vermelhas} mostram o caminho de cada uma até o lugar dela; nas figuras ``como fica'' está o
+resultado esperado. Os \textbf{desenhos} (cortes, ligações, medidas) mostram o que o CAD não
+mostra: como segurar o ferro, onde vai cada fio, em que ordem apertar.
 
 Os comandos em caixa cinza são digitados num terminal, na raiz do projeto, com o ambiente
 Python ativo (\cmd{source .venv/bin/activate}). Os comandos do firmware (\cmd{diag},
@@ -311,7 +326,8 @@ Python ativo (\cmd{source .venv/bin/activate}). Os comandos do firmware (\cmd{di
   \item \textbf{Capacitores do barramento carregados}: os 2 de \qty{4700}{\micro\farad}
     descarregam só pelo divisor de tensão (cerca de 2~min). Depois de desligar a fonte,
     espere antes de mexer nos bornes do IBT-2.
-  \item \textbf{Botão de emergência ao alcance da mão} em todos os testes com motor.
+  \item \textbf{Terminal pronto para mandar \cmd{s}} (ou o dedo no botão KEY) em todos os
+    testes com motor.
   \item \textbf{Nunca ligue o USB-C da Black Pill com o buck ligado}: o pino 5V da placa vai
     direto ao USB, sem proteção.
 \end{enumerate}
@@ -394,6 +410,25 @@ almofada de TPU & 2 & amortecem o braço nos batentes & 2~g & \linha[1.4cm] \\
   \label{fig:pecas}
 \end{figure}
 
+\subsection{Nomes das partes}
+
+Os passos usam os nomes das figuras~\ref{fig:nomesbraco} e~\ref{fig:nomesbase}. Vale
+reconhecer cada parte na peça de verdade antes de começar.
+
+\begin{figure}[H]
+  \centering
+  \ilNomesBraco
+  \caption{O braço visto por trás (lado do motor), como sai da impressora.}
+  \label{fig:nomesbraco}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \ilNomesBase
+  \caption{A base com a bandeja.}
+  \label{fig:nomesbase}
+\end{figure}
+
 \subsection{Peças compradas}
 
 \begin{multicols}{2}
@@ -411,7 +446,6 @@ almofada de TPU & 2 & amortecem o braço nos batentes & 2~g & \linha[1.4cm] \\
   \item conversor buck 12~V \flecha{} 5~V
   \item fonte 12~V de 10~A ou mais
   \item fusível 10~A retardado e porta-fusível
-  \item botão de emergência NF, DC, 10~A ou mais
   \item 2 capacitores eletrolíticos \qty{4700}{\micro\farad}/35~V
   \item 6 capacitores cerâmicos \qty{100}{\nano\farad}
   \item TVS SMBJ15A
@@ -456,50 +490,65 @@ M8 $\times$ 16 + porca + arruela & 12 (de 14) & aro da roda. \textbf{Exatos 16~m
 \section{Trilha mecânica}
 \label{sec:mecanica}
 
+A trilha mecânica transforma as peças impressas e compradas no braço montado, girando no
+pivô da base. Siga a ordem da figura~\ref{fig:fluxo}. Nas vistas explodidas as peças
+aparecem afastadas e as \textbf{setas vermelhas} mostram o caminho de cada uma até o
+lugar dela.
+
 \begin{tarefa}{M1}{Inspeção e teste de encaixe}{2}{40 min}{---}
+\objetivo{conferir que as peças compradas encaixam nas impressas \emph{antes} de soldar,
+colar ou apertar qualquer coisa. Os nomes das partes estão nas figuras~\ref{fig:nomesbraco}
+e~\ref{fig:nomesbase}.}
 \textbf{Material:} todas as peças impressas, paquímetro, um rolamento 608, a barra de 8~mm,
 o motor, um sensor óptico, um inserto M3, uma porca e um parafuso M8, o policarbonato.
-
-As peças foram impressas com as medidas típicas de \arq{cad/params.scad}. Esta tarefa
-confere se as peças compradas de verdade encaixam nelas, \emph{antes} de soldar ou colar
-qualquer coisa.
 \begin{passos}
   \item \textbf{Roda}:
     \begin{checklist}
-      \item aro sem rachaduras nem camadas soltas (aperte com os dedos e dê batidas leves:
-        o som deve ser ``cheio'');
+      \item aro sem rachaduras nem camadas soltas: aperte com os dedos e dê batidas leves
+        com o cabo de uma chave; o som deve ser ``cheio'', não ``rachado'';
       \item os 40 dentes do anel do encoder inteiros, sem fios de plástico entre eles
         (limpe com o estilete);
-      \item os 12 furos de 8,4~mm livres; a porca M8 entra no alojamento hexagonal de trás;
+      \item os 12 furos de 8,4~mm livres; a porca M8 entra no alojamento sextavado de trás;
       \item 4 furos de inserto no cubo; diâmetro do aro \aprox{} 116~mm e do anel dentado
-        \aprox{} 132~mm (escala certa).
+        \aprox{} 132~mm (confirma que a escala da impressão está certa).
     \end{checklist}
   \item \textbf{Braço}:
     \begin{checklist}
-      \item o rolamento entra nos dois assentos com pressão firme (nem solto, nem
+      \item o rolamento entra nos dois assentos do tubo com pressão firme (nem solto, nem
         impossível);
-      \item a carcaça do motor encaixa no rebaixo de trás e os 2 furos M4 coincidem com os
-        do motor;
-      \item o ressalto do motor passa pelo furo central sem raspar;
+      \item a carcaça do motor encaixa no rebaixo e os 2 furos M4 coincidem com os do motor;
+      \item o ressalto do motor (o ``degrau'' em volta do eixo) passa pelo furo central sem
+        raspar;
       \item os 4 furos de inserto (2 na frente, 2 atrás) abertos.
     \end{checklist}
-  \item \textbf{Suporte dos sensores}: rasgos livres; o sensor óptico deitado na prateleira
+  \item \textbf{Suporte dos sensores}: rasgos livres; o sensor óptico deitado na prateleira,
     com o parafuso M3 passando pelo rasgo.
   \item \textbf{Base}: a barra de 8~mm passa pelos dois suportes; o policarbonato entra nas
-    ranhuras dos postes; a base não está empenada (apoiada na mesa, não balança).
+    ranhuras dos postes; apoiada na mesa, a base não balança (não está empenada).
   \item \textbf{Bandeja}: os 4 furos dos cantos coincidem com as colunas da base.
-  \item \textbf{Medidas críticas das peças compradas} (paquímetro, resolução 0,1~mm):
-    diâmetro da carcaça do motor (projeto: 44,5~mm), distância entre os furos M4 (29~mm),
-    altura das torres do sensor acima da placa (10,8~mm), largura da fenda (5~mm) e
-    diâmetro do inserto (4,2~mm; o furo é de 4,0). Se alguma for diferente, troque o número
-    em \arq{cad/params.scad} e rode \cmd{python cad/folgas.py}: ele diz se a peça impressa
-    ainda serve.
+  \item \textbf{Medidas das peças compradas} (paquímetro, resolução de 0,1~mm). Compare com
+    o projeto:
+    \begin{center}\small
+    \begin{tabular}{@{}lcc@{}}
+      \toprule
+      medida & projeto & medido \\
+      \midrule
+      diâmetro da carcaça do motor & 44,5~mm & \linha[1.6cm] \\
+      distância entre os furos M4 do motor & 29~mm & \linha[1.6cm] \\
+      altura das torres do sensor acima da placa & 10,8~mm & \linha[1.6cm] \\
+      largura da fenda do sensor & 5~mm & \linha[1.6cm] \\
+      diâmetro externo do inserto (o furo é de 4,0~mm) & 4,2~mm & \linha[1.6cm] \\
+      \bottomrule
+    \end{tabular}
+    \end{center}
+    Se alguma for diferente, troque o número em \arq{cad/params.scad} e rode
+    \cmd{python cad/folgas.py}: ele diz se a peça impressa ainda serve.
 \end{passos}
 \textbf{Aceite:} tudo encaixa e \cmd{folgas.py} termina com \cmd{TODAS AS FOLGAS OK}.
 
 \textbf{Se falhar:}
 \begin{itemize}
-  \item furo apertado \flecha{} broca do diâmetro certo, girando com a mão, ou lima redonda;
+  \item furo apertado \flecha{} broca do diâmetro certo girada com a mão, ou lima redonda;
   \item rolamento justo demais \flecha{} será prensado na morsa (M6); folgado \flecha{} gota de
     cola no anel externo (M6);
   \item rebarba ou fio de plástico \flecha{} estilete;
@@ -509,23 +558,30 @@ qualquer coisa.
 \end{tarefa}
 
 \begin{tarefa}{M2}{Pesar e medir antes de montar}{1}{50 min}{M1}
+\objetivo{medir o que só dá para medir com as peças soltas. Esses números entram no modelo
+(I6) e mudam os ganhos do controle.}
 \textbf{Material:} balança, multímetro, as peças impressas, o motor, o flange, os 14
 conjuntos M8, o suporte dos sensores, os 2 sensores, o MPU6050 e os espaçadores.
 
-Estas medidas alimentam o modelo (I6). Várias delas \textbf{só podem ser feitas agora},
-com as peças soltas. Anote tudo na tabela~\ref{tab:medidas}.
+Anote cada valor na hora, na tabela~\ref{tab:medidas}, e fotografe o visor.
 \begin{passos}
   \item \textbf{Peças impressas}: pese cada uma e anote na tabela~\ref{tab:impressas}. A
-    \textbf{roda é pesada agora, sem os insertos}.
-  \item \textbf{Motor}: pese sem fios. Depois meça a resistência: encoste as pontas do
-    multímetro uma na outra e anote a leitura ($R_\text{pontas}$); meça nos terminais do
-    motor em 4 posições do eixo (1/4 de volta entre elas) e fique com a \textbf{menor}
-    ($R_\text{min}$). A resistência é $R = R_\text{min} - R_\text{pontas}$ (típico: 0,3 a
-    \qty{1}{\ohm}).
+    \textbf{roda é pesada agora, sem os insertos}: depois do M4 essa medida se perde.
+  \item \textbf{Massa do motor}: pese sem fios.
+  \item \textbf{Resistência do motor}, em três partes:
+    \begin{passos}
+      \item encoste uma ponta do multímetro na outra, na escala de \qty{200}{\ohm}, e anote a
+        leitura: é a resistência das pontas ($R_\text{pontas}$);
+      \item meça entre os 2 terminais do motor; gire o eixo 1/4 de volta com a mão e meça de
+        novo, até ter 4 leituras; fique com a \textbf{menor} ($R_\text{min}$);
+      \item a resistência é $R = R_\text{min} - R_\text{pontas}$ (típico: 0,3 a
+        \qty{1}{\ohm}).
+    \end{passos}
   \item \textbf{Flange}: pese com os parafusos de trava.
   \item \textbf{Conjuntos M8}: monte os 14 conjuntos como vão na roda (parafuso
-    M8 $\times$ 16, arruela, porca) e pese cada um. Separe os 12 mais parecidos ($\pm$0,5~g
-    na balança de 0,1~g, ou a mesma leitura na de 1~g) e anote a média.
+    M8 $\times$ 16, arruela e porca) e pese cada um. Separe os 12 mais parecidos ($\pm$0,5~g
+    na balança de 0,1~g, ou a mesma leitura na de 1~g) e anote a média. Os 2 que sobram são
+    reserva.
   \item \textbf{Extras do braço}: pese juntos o suporte dos sensores, os 2 sensores, o
     MPU6050, os 2 espaçadores e os 6 parafusos deles.
 \end{passos}
@@ -537,94 +593,142 @@ partida do 775 passa de 10~A e queima o fusível do multímetro.
 \end{tarefa}
 
 \begin{tarefa}{M3}{Cortar a barra e furar o policarbonato}{1}{50 min}{---}
+\objetivo{preparar o eixo do pivô (a barra de 82~mm) e a proteção transparente que fica
+entre a roda e quem opera.}
 \textbf{Material:} barra de 8~mm, serra para metal, lima, morsa, régua, policarbonato,
 furadeira, broca de 3,5~mm, punção, madeira de apoio.
+\figil{\ilPoliBarra}{Medidas do policarbonato (em mm) e da barra.}{fig:polibarra}
 \begin{passos}
-  \item \textbf{Barra}: marque \textbf{82~mm} (o \cmd{folgas.py} confirma: ``cortar com 82
-    mm''). Prenda na morsa com um pano e corte devagar.
-  \item Tire a rebarba com a lima e faça um chanfro leve nas duas pontas. Teste: os colares
-    deslizam e travam; os rolamentos entram na barra sem folga visível. Guarde a sobra.
+  \item \textbf{Barra}: marque \textbf{82~mm} com caneta (o \cmd{folgas.py} confirma:
+    ``cortar com 82 mm''). Prenda na morsa com um pano em volta e corte devagar, deixando a
+    marca do lado de fora do corte.
+  \item Tire a rebarba com a lima e faça um chanfro leve nas duas pontas (a barra entra
+    melhor nos rolamentos). Teste: os colares deslizam e travam; os rolamentos entram na
+    barra sem folga visível. Guarde a sobra.
   \item \textbf{Policarbonato}: placa de 230 $\times$ 230~mm. Se não veio cortada, corte com
     serra de lâmina fina, presa entre duas tábuas.
-  \item Marque os 2 furos de \textbf{3,5~mm} a \textbf{20~mm da borda de baixo} e a
-    \textbf{55~mm de cada borda lateral} (120~mm entre os centros). Não é preciso imprimir o
-    gabarito SVG (ele é maior que uma folha A4).
-  \item Punção leve, madeira por baixo, furadeira em baixa rotação e sem forçar: o
-    policarbonato racha perto da borda. Mantenha a película protetora até o fim.
+  \item Marque os 2 furos como na figura~\ref{fig:polibarra}: a \textbf{20~mm da borda de
+    baixo} e a \textbf{55~mm de cada lado} (120~mm entre os centros). Não é preciso imprimir
+    o gabarito SVG.
+  \item Faça uma marca leve com o punção, ponha madeira por baixo e fure em baixa rotação,
+    sem forçar: o policarbonato racha perto da borda. Mantenha a película protetora até o
+    fim.
 \end{passos}
 \textbf{Aceite:} barra com 82 $\pm$ 0,5~mm e sem rebarba; furos a 120~mm entre centros.
 \end{tarefa}
 
 \begin{tarefa}{M4}{Insertos térmicos}{1 ou 2}{30 min}{M2 (roda já pesada)}
+\objetivo{colocar as roscas metálicas (insertos) nos 16 furos que recebem parafusos M3. O
+inserto é derretido para dentro do plástico com o ferro de solda e fica preso para sempre.}
 \textbf{Material:} ferro de solda com ponta cônica (ou ponta própria para insertos),
-16 insertos M3 e 2 de reserva, um parafuso M3 para testar, superfície plana metálica.
-
-\textbf{Os 16 lugares:}
-\begin{checklist}
-  \item roda: 4, no cubo, do lado de trás (onde o flange encosta);
-  \item braço: 2 na frente (suporte dos sensores) e 2 atrás (MPU6050);
-  \item base: 2 no topo dos suportes da barra, 4 nas colunas da bandeja e 2 na parte de
-    trás dos postes da proteção.
-\end{checklist}
+16 insertos M3 e 2 de reserva, um parafuso M3 para testar, um pedaço de metal plano.
+\figil{\ilInserto}{Como colocar um inserto, em corte. O inserto é um pouco maior que o furo:
+  o plástico derrete em volta dele e prende o serrilhado.}{fig:inserto}
 \begin{passos}
-  \item Ferro a cerca de \textbf{220~°C}. Apoie o inserto reto sobre o furo, com o lado
-    estreito para baixo.
-  \item Encoste a ponta do ferro dentro do inserto e deixe o peso do ferro empurrar, sem
-    forçar, até ele ficar \textbf{0,2~mm abaixo da superfície}. Mantenha o ferro na vertical.
-  \item Tire o ferro e, logo em seguida, assente o inserto com uma superfície plana e fria
-    por 5~s (deixa o topo nivelado).
+  \item Separe as peças e localize os 16 furos na figura~\ref{fig:insertos} (em vermelho):
+    \begin{checklist}
+      \item roda: 4, no cubo, do lado de trás (onde o flange encosta);
+      \item braço: 2 na frente (suporte dos sensores) e 2 atrás (MPU6050);
+      \item base: 2 no topo dos suportes da barra, 4 nas colunas da bandeja e 2 na parte de
+        trás dos postes da proteção.
+    \end{checklist}
+  \item Ferro a cerca de \textbf{220~°C}. Apoie a peça na mesa com o furo para cima e o
+    inserto reto sobre o furo, com o lado estreito para baixo.
+  \item Encoste a ponta do ferro dentro do inserto e deixe o \textbf{peso do ferro}
+    empurrar, sem forçar, até o inserto ficar \textbf{0,2~mm abaixo da superfície}.
+    Mantenha o ferro na vertical: inclinado, o inserto entra torto.
+  \item Tire o ferro e, logo em seguida, pressione o topo com o metal plano e frio por 5~s:
+    o inserto fica nivelado e o plástico esfria em volta dele.
   \item Espere 1~min e teste: um parafuso M3 entra até o fim sem travar.
   \item Com dois ferros, duas pessoas: uma faz a roda e o braço, a outra a base.
 \end{passos}
+\begin{center}
+  \begin{minipage}[b]{0.22\linewidth}\centering
+    \includegraphics[width=\linewidth]{ins_roda}\\{\footnotesize roda, face de trás}\end{minipage}\hfill
+  \begin{minipage}[b]{0.12\linewidth}\centering
+    \includegraphics[width=\linewidth]{ins_braco_frente}\\{\footnotesize braço, frente}\end{minipage}\hfill
+  \begin{minipage}[b]{0.12\linewidth}\centering
+    \includegraphics[width=\linewidth]{ins_braco_tras}\\{\footnotesize braço, trás}\end{minipage}\hfill
+  \begin{minipage}[b]{0.38\linewidth}\centering
+    \includegraphics[width=\linewidth]{ins_base}\\{\footnotesize base (os 2 dos postes ficam
+    do lado de trás deles)}\end{minipage}
+  \captionof{figure}{Os 16 lugares dos insertos, em vermelho.}\label{fig:insertos}
+\end{center}
 \textbf{Aceite:} 16 insertos retos e nivelados; um M3 entra em cada um.\quad
 \textbf{Se falhar:} inserto torto \flecha{} reaqueça e endireite com a ponta do ferro enquanto o
 plástico está mole; inserto solto \flecha{} use um dos 2 de reserva com uma gota de cola.
 \end{tarefa}
 
 \begin{tarefa}{M5}{Capacitores e chicote do motor}{1}{40 min}{---}
+\objetivo{preparar o motor enquanto ele está solto: 3 capacitores que cortam o ruído
+elétrico das escovas (o ruído trava o MPU6050) e os 2 fios grossos que levam a corrente até
+o IBT-2.}
 \textbf{Material:} motor, 3 capacitores cerâmicos de \qty{100}{\nano\farad}, fio de silicone
-14~AWG vermelho e preto, termo-retrátil, lixa fina.
-
-É mais fácil soldar no motor agora, com ele solto, do que depois de montado no braço.
+14~AWG vermelho e preto, termo-retrátil, lixa fina, multímetro.
+\figil{\ilCapMotor}{Motor visto por trás (lado dos terminais), com os 3 capacitores
+  soldados.}{fig:capmotor}
 \begin{passos}
-  \item \textbf{Comprimento do chicote}: do motor (atrás, no topo do braço) desce pelo braço,
-    passa perto do pivô e vai até os bornes M+ e M$-$ do IBT-2 na bandeja (atrás da base).
-    Meça esse caminho numa montagem a seco, com o braço inclinado de um batente ao outro, e
-    some 10~cm.
-  \item Corte 2 fios de 14~AWG nesse comprimento, trance (cerca de uma volta a cada 2~cm) e
-    estanhe as pontas.
-  \item Lixe um ponto pequeno da carcaça do motor, perto dos terminais, para a solda pegar.
-  \item Solde os 3 capacitores: \textbf{um entre os dois terminais} e \textbf{um de cada
-    terminal até a carcaça}. Pernas curtas. Eles cortam a maior parte do ruído que trava o
-    I2C do MPU6050.
-  \item Solde o chicote nos terminais (vermelho no terminal marcado com $+$ ou ponto
-    vermelho) e isole com termo-retrátil. Etiquete a outra ponta: M+ e M$-$.
+  \item \textbf{Comprimento do chicote}: o caminho vai do motor (no topo do braço), desce pelo
+    braço, passa perto do pivô e chega aos bornes M+ e M$-$ do IBT-2, na bandeja atrás da
+    base (figura~\ref{fig:chicotes}). Meça esse caminho com um barbante numa montagem a seco,
+    com o braço inclinado de um batente ao outro, e some 10~cm.
+  \item Corte 2 fios de 14~AWG nesse comprimento. Trance os dois (cerca de uma volta a cada
+    2~cm) e estanhe as pontas.
+  \item Lixe um ponto pequeno da carcaça do motor, perto dos terminais, até ver o metal
+    brilhante: sem isso a solda não pega na carcaça.
+  \item Solde os 3 capacitores como na figura~\ref{fig:capmotor}, com as pernas curtas:
+    \begin{passos}
+      \item C1 entre os dois terminais;
+      \item C2 do terminal $+$ até o ponto lixado;
+      \item C3 do terminal $-$ até o ponto lixado.
+    \end{passos}
+  \item Solde o chicote nos terminais: \textbf{vermelho no terminal $+$} (o que tem a marca
+    ou o ponto vermelho), preto no outro. Isole com termo-retrátil e etiquete a outra ponta:
+    M+ e M$-$.
 \end{passos}
-\textbf{Aceite:} soldas firmes; o multímetro \textbf{não} dá continuidade entre os terminais
-e a carcaça (os capacitores aparecem como circuito aberto).
+\textbf{Aceite:} soldas firmes e brilhantes; o multímetro em continuidade \textbf{não} apita
+entre os terminais e a carcaça (capacitor aparece como circuito aberto).
 \end{tarefa}
 
 \begin{tarefa}{M6}{Braço: rolamentos, motor e flange}{1}{50 min}{M4 e M5}
+\objetivo{montar no braço os dois rolamentos do pivô, o motor e o flange que vai segurar a
+roda.}
 \textbf{Material:} braço com insertos, 2 rolamentos 608-ZZ, motor com chicote, 2 parafusos
-M4 $\times$ 8, flange, trava-rosca, morsa com mordente macio, balança.
+M4 $\times$ 8, flange, trava-rosca, morsa com mordente macio, balança, broca de 2~mm.
+\figpasso{exp_braco}{5.6cm}{Vista explodida do braço: um rolamento entra pela frente e o outro
+  por trás; o motor encaixa por trás; os 2 parafusos M4 entram pela frente; o flange vai no
+  eixo, pela frente.}
 \begin{passos}
-  \item \textbf{Rolamentos}: encaixe um no assento da frente (a face do braço que ficou na
-    mesa da impressora) e outro na ponta do tubo, atrás. Se estiverem justos, prense na
-    morsa com mordente macio, empurrando só o anel externo. Se estiverem folgados, uma gota
-    de cola no anel externo, \textbf{nunca} no interno.
-  \item \textbf{Pese o braço} com os rolamentos e os insertos, \emph{antes} do motor. Anote
-    (\cmd{m_braco}).
+  \item \textbf{Rolamentos}: encaixe um no assento da frente do tubo (a face do braço que
+    ficou na mesa da impressora) e o outro no assento de trás.
+    \begin{itemize}
+      \item justos: prense na morsa com mordente macio, empurrando \textbf{só o anel
+        externo} (um soquete do tamanho do anel externo ajuda);
+      \item folgados: uma gota de cola no anel externo, \textbf{nunca} no interno.
+    \end{itemize}
+  \item \textbf{Pese o braço} com os rolamentos e os insertos, \emph{antes} do motor, e anote
+    na tabela~\ref{tab:medidas} (\cmd{m_braco}).
   \item \textbf{Motor}: encaixe a carcaça no rebaixo de trás do braço, com os terminais
-    virados para o lado em que o chicote vai descer. Prenda com os 2 parafusos
-    \textbf{M4 $\times$ 8}, colocados pela frente.
-  \item \textbf{Flange}: no eixo do motor, com o cubo a cerca de \textbf{2~mm do ressalto}
-    (o \cmd{folgas.py} prevê 1,9~mm; use uma broca de 2~mm como calço). Gire até um parafuso
-    de trava ficar no lado plano do eixo; uma gota de trava-rosca em cada parafuso e aperte.
+    virados para o lado em que o chicote vai descer (figura~\ref{fig:chicotes}). Prenda
+    com os 2 parafusos \textbf{M4 $\times$ 8}, colocados pela frente do braço. Não use
+    parafusos mais compridos: eles tocam o enrolamento do motor.
+  \item \textbf{Flange} (figura~\ref{fig:flange}):
+    \begin{passos}
+      \item enfie o flange no eixo, com o cubo virado para o motor e o disco para fora;
+      \item ponha a broca de 2~mm atravessada entre o ressalto do motor e o cubo, como calço,
+        e encoste o flange nela (o \cmd{folgas.py} prevê 1,9~mm);
+      \item gire o flange até um dos parafusos de trava ficar em cima do \textbf{lado plano}
+        do eixo;
+      \item uma gota de trava-rosca em cada parafuso de trava, aperte primeiro o do lado
+        plano, depois o outro, e tire a broca.
+    \end{passos}
   \item Espere \textbf{30~min} antes de girar o motor com a roda (cura do trava-rosca).
 \end{passos}
-\figdupla{etapa1_rolamentos}{etapa2_motor}{4.6cm}{braço com os rolamentos, visto da frente}%
-  {motor no rebaixo, visto de trás}
-\figpasso{etapa3_flange}{4.6cm}{flange no eixo, visto da frente}
+\figil{\ilFlange}{Flange no eixo, em corte: a broca de 2~mm marca a distância até o motor, e
+  um parafuso de trava aperta o lado plano do eixo.}{fig:flange}
+\figdupla{etapa1_rolamentos}{etapa2_motor}{4.4cm}{como fica: rolamentos no tubo (frente)}%
+  {motor no rebaixo (trás)}
+\figpasso{etapa3_flange}{4.4cm}{como fica: flange no eixo (frente)}
 \textbf{Aceite:} os rolamentos giram livres; o motor não balança; o flange não escorrega no
 eixo.\quad
 \textbf{Se falhar:} motor com folga no rebaixo \flecha{} uma volta de fita isolante na
@@ -632,94 +736,117 @@ carcaça.
 \end{tarefa}
 
 \begin{tarefa}{M7}{Roda e balanceamento}{1}{50 min}{M6 (trava-rosca curado) e M2}
+\objetivo{prender os 12 conjuntos M8 (que dão a massa da roda), prender a roda no flange e
+deixá-la balanceada.}
 \textbf{Material:} roda com insertos, os 12 conjuntos M8 separados no M2, 4 parafusos
-M3 $\times$ 8, chave Allen de M8 e chave de boca de 13~mm.
+M3 $\times$ 8, chave Allen de M8, chave de boca de 13~mm e chave Allen de M3 em L.
+\figdupla{exp_m8}{exp_roda}{5.4cm}{os conjuntos M8: cabeça e arruela na frente, porca no
+  alojamento de trás}{a roda vai no flange; os 4 M3 entram por trás do flange}
 \begin{passos}
-  \item \textbf{Parafusos M8}: em cada um dos 12 furos, cabeça e arruela na \textbf{frente}
-    da roda (o lado sem os alojamentos hexagonais) e porca no alojamento de trás.
-  \item Aperte bem, em cruz (como roda de carro): 1, 7, 4, 10, 2, 8, \dots
-  \item \textbf{Roda no flange}: encoste o cubo da roda no disco do flange, alinhando os 4
-    insertos com os 4 furos do flange, e prenda com os 4 parafusos M3 $\times$ 8, também em
-    cruz. A face com os alojamentos das porcas fica virada para o braço.
-  \item Gire a roda com a mão: ela não pode bater no braço nem nas cabeças dos parafusos
-    M4. Olhe de lado: o aro não pode ``bambear''.
-  \item \textbf{Balanceamento}: gire a roda com força média várias vezes e veja onde ela
-    para. Ela tem que parar em posições aleatórias. Se parar sempre com o mesmo lado para
-    baixo, aquele lado está pesado: troque parafusos de lugar (o mais pesado para o lado que
-    fica em cima) e repita até melhorar.
+  \item \textbf{Parafusos M8}: em cada um dos 12 furos, coloque o parafuso com a arruela pela
+    \textbf{frente} da roda (o lado liso, sem alojamentos sextavados) e encaixe a porca no
+    alojamento sextavado de trás. O alojamento segura a porca: só o parafuso gira.
+  \item Aperte bem, na ordem da figura~\ref{fig:aperto} (como roda de carro: cada parafuso e
+    depois o oposto).
+  \item \textbf{Roda no flange}: encoste o cubo da roda (face de trás) no disco do flange,
+    alinhando os 4 insertos com os 4 furos do flange. Os 4 parafusos M3 $\times$ 8 entram
+    \textbf{por trás do disco do flange}, pelo vão entre o braço e o flange, e rosqueiam nos
+    insertos da roda. Use o lado curto da chave em L e aperte em cruz.
+  \item Gire a roda com a mão: ela não pode bater no braço nem nas cabeças dos parafusos M4.
+    Olhe de lado, na altura do aro: ele não pode ``bambear''.
+  \item \textbf{Balanceamento} (figura~\ref{fig:balanceamento}): gire a roda com força média
+    e espere parar; repita umas 5 vezes. Ela tem que parar em posições diferentes. Se parar
+    sempre com o mesmo lado para baixo, esse lado está pesado: troque o parafuso mais pesado
+    desse lado (pela pesagem do M2) com um do lado de cima e repita até melhorar.
 \end{passos}
-\figpasso{etapa4_roda}{5.2cm}{roda com os 12 conjuntos M8, presa no flange}
+\figil{\ilAperto}{Ordem de aperto: os números dizem a sequência.}{fig:aperto}
+\figil{\ilBalanceamento}{Balanceamento: o lado que sempre para embaixo é o pesado.}{fig:balanceamento}
+\figpasso{etapa4_roda}{5cm}{como fica: roda com os 12 conjuntos M8, presa no flange}
 \textbf{Aceite:} a roda gira livre, sem bater nem bambear, e para em posições aleatórias.
 
 \textbf{Se falhar:} a roda bambeia \flecha{} solte os 4 M3, gire a roda meia volta no flange e
-reaperte; o flange torto no eixo \flecha{} refaça o M6, passo do flange.
+reaperte; o flange está torto no eixo \flecha{} refaça o passo do flange no M6.
 \end{tarefa}
 
 \begin{tarefa}{M8}{Sensores ópticos e MPU6050 no braço}{1}{45 min}{M7}
+\objetivo{montar o encoder (os 2 sensores ópticos que contam os dentes do anel da roda) e o
+MPU6050 (que mede o ângulo e a velocidade do braço).}
 \textbf{Material:} suporte dos sensores, 2 sensores ópticos, MPU6050, 2 espaçadores de
 3~mm, parafusos M3 (2 $\times$ 10 com porca, 2 $\times$ 10, 2 $\times$ 12).
+\figdupla{exp_sensores}{sensores_zoom}{5.2cm}{suporte na frente do braço e sensores deitados
+  na prateleira}{corte num sensor: o anel dentado passa no meio da fenda, entre as duas torres}
 \begin{passos}
   \item \textbf{Suporte}: na frente do braço, embaixo da roda, com 2 parafusos
-    M3 $\times$ 10 nos insertos, passando pelos rasgos verticais. Deixe ainda frouxo.
+    M3 $\times$ 10 nos insertos da frente, passando pelos rasgos verticais. Deixe frouxo
+    por enquanto.
   \item \textbf{Sensores}: deitados na prateleira, com as torres para cima e a fenda virada
-    para a roda, presos com M3 $\times$ 10 e porca por baixo. Os traços na borda da prateleira
-    marcam a posição de cada sensor.
-  \item \textbf{Altura}: suba ou desça o suporte nos rasgos até o anel dentado da roda ficar
-    \textbf{centrado na fenda} dos dois sensores, sem encostar nas torres. Aperte.
-  \item Com os sensores alimentados (3V3 da Black Pill ou uma bateria de 3~V a 5~V), gire a
-    roda devagar com a mão: o LED de cada módulo tem que piscar a cada dente. Se não houver
-    alimentação ainda, deixe esta conferência para o I3.
-  \item \textbf{MPU6050}: atrás do braço, nos 2 insertos de trás, com os espaçadores de 3~mm
-    entre a placa e o braço e 2 parafusos M3 $\times$ 12. O \textbf{eixo Y} impresso no
-    módulo aponta \textbf{para o motor} (para cima com o braço em pé). Pinos virados para
-    o lado do chicote.
+    para a roda, presos com M3 $\times$ 10 e porca por baixo. Os traços na borda da
+    prateleira marcam a posição de cada sensor: alinhe o centro da fenda com o traço.
+  \item \textbf{Altura}: suba ou desça o suporte nos rasgos até o anel dentado ficar
+    \textbf{no meio da fenda} dos dois sensores, sem encostar nas torres. Gire a roda com a
+    mão e olhe de lado. Aperte os 2 parafusos do suporte.
+  \item Se já houver como alimentar os sensores (3V3 da Black Pill do E1, ou 3 a 5~V de uma
+    bateria), gire a roda devagar: o LED de cada módulo pisca a cada dente. Se não houver,
+    essa conferência fica para o I3.
+  \item \textbf{MPU6050} (figura~\ref{fig:mpu}): atrás do braço, nos 2 insertos de trás. A
+    ordem, de fora para dentro, é: parafuso M3 $\times$ 12, placa do MPU6050, espaçador de
+    3~mm, braço. A seta \textbf{Y} impressa no módulo aponta \textbf{para o motor} (para
+    cima com o braço em pé). Os pinos ficam do lado em que os fios de sinal vão descer.
 \end{passos}
-\figdupla{etapa5_sensores}{etapa5_mpu}{5cm}{suporte e sensores embaixo da roda}%
-  {MPU6050 atrás do braço (retângulo azul)}
+\figil{\includegraphics[height=4.6cm]{exp_mpu}}{MPU6050 atrás do braço: parafusos, placa
+  (seta Y para cima), espaçadores e os insertos no braço.}{fig:mpu}
+\figdupla{etapa5_sensores}{etapa5_mpu}{4.6cm}{como fica: suporte e sensores embaixo da roda}%
+  {como fica: MPU6050 atrás do braço (retângulo azul)}
 \textbf{Aceite:} o anel passa pelo meio das duas fendas sem raspar; MPU6050 firme e reto.
 
 \textbf{Se falhar:} o anel raspa numa torre \flecha{} afrouxe o sensor e deslize-o no rasgo
 (alguns décimos de milímetro); o MPU6050 torto faz o pêndulo ``preferir'' um lado: alinhe
-pela borda do braço.
+a placa pela borda do braço.
 \end{tarefa}
 
 \begin{tarefa}{M9}{Base, almofadas e bandeja}{1}{40 min}{M4}
+\objetivo{deixar a base pronta para receber o braço: almofadas nos batentes, base presa na
+mesa e bandeja da eletrônica no lugar.}
 \textbf{Material:} base com insertos, 2 almofadas de TPU, cola de contato, bandeja, 4
-parafusos M3 $\times$ 8, 2 sargentos.
+parafusos M3 $\times$ 8, 2 sargentos (ou 4 parafusos para madeira).
 \begin{passos}
-  \item \textbf{Almofadas}: cola de contato nas duas faces (almofada e face inclinada de cada
-    batente), espere de 10 a 15~min até secar ao toque e pressione com força por 10~s. Sem
-    TPU, use EVA ou borracha de 3~mm cortado em 37,8 $\times$ 16~mm.
+  \item \textbf{Almofadas}: passe cola de contato nas duas faces que vão se encostar (a
+    almofada e a face inclinada de cada batente), espere de 10 a 15~min até secar ao toque
+    e pressione com força por 10~s. Sem TPU, use EVA ou borracha de 3~mm cortada em
+    37,8 $\times$ 16~mm.
   \item \textbf{Base na mesa}: parafusos nos 4 furos dos cantos ou 2 sargentos. Quando o braço
     bate no batente, o tranco vai para a base: ela não pode andar.
   \item \textbf{Bandeja}: sobre as 4 colunas, com 4 parafusos M3 $\times$ 8 nos insertos.
-    Pode ficar solta até o I1, se for mais fácil montar a eletrônica fora da base.
+    Ela pode ficar solta até o I1, se for mais fácil montar a eletrônica fora da base.
 \end{passos}
-\figpasso{etapa6_base}{4cm}{base com as almofadas pretas nos batentes e a bandeja atrás}
+\figpasso{etapa6_base}{4cm}{como fica: almofadas pretas nos batentes e a bandeja atrás}
 \textbf{Aceite:} base firme na mesa; almofadas bem coladas; bandeja assentada nas colunas.
 \end{tarefa}
 
 \begin{tarefa}{M10}{Pivô: o braço na base}{2}{30 min}{M3, M8 e M9}
+\objetivo{passar a barra pelos suportes da base e pelos rolamentos do braço, de modo que o
+braço gire livre e sem folga.}
 \textbf{Material:} braço completo, base, barra de 82~mm, 2 colares SCC8, 2 parafusos
 M3 $\times$ 12, chave Allen, uma folha de papel.
-
-A barra entra \textbf{pela frente} (lado da roda) e atravessa, nesta ordem: suporte da
-frente, colar da frente, braço (os dois rolamentos), colar de trás, suporte de trás. Uma
-pessoa segura o braço e os colares alinhados; a outra empurra a barra.
+\figil{\ilPivo}{O pivô em corte, visto de lado: a barra entra pela frente e atravessa as
+  peças na ordem dos números.}{fig:pivo}
 \begin{passos}
-  \item Posicione o braço entre os dois suportes, com os colares nos espaços entre os
-    suportes e o tubo dos rolamentos.
-  \item Empurre a barra devagar, girando de leve, até ela sair 3~mm além do suporte de trás.
-    Ela deve sair 3~mm também na frente.
+  \item Uma pessoa segura o braço entre os dois suportes, com a roda para a frente, e põe
+    um colar de cada lado do tubo, alinhados com o furo.
+  \item A outra empurra a barra \textbf{pela frente}, girando de leve, na ordem da
+    figura~\ref{fig:pivo}: suporte da frente, colar, braço (os dois rolamentos), colar,
+    suporte de trás. A barra sai 3~mm além de cada suporte.
   \item Aperte os 2 parafusos de trava (M3 $\times$ 12) no topo dos suportes: a barra não
     gira nem desliza.
-  \item Encoste cada colar no \textbf{anel interno} do rolamento, com uma folha de papel no
-    meio como calço, aperte o parafuso do colar e tire o papel.
+  \item Para cada colar: ponha a folha de papel entre o colar e o
+    \textbf{anel interno} do rolamento, encoste o colar, aperte o parafuso do colar e tire
+    o papel. O papel deixa uma folga mínima: o colar segura o braço no lugar sem frear o
+    rolamento.
   \item Teste: incline o braço até um batente e solte. Ele tem que cair livre até o outro
-    batente, e balançar algumas vezes antes de parar. Não pode raspar nem ter folga axial
-    perceptível.
+    batente e balançar algumas vezes antes de parar. Não pode raspar nem ter folga para a
+    frente e para trás que dê para sentir com a mão.
 \end{passos}
-\figdupla{etapa7_pivo}{montagem_lado}{4.6cm}{a barra entra pela frente}{montado, visto de lado}
+\figdupla{etapa7_pivo}{montagem_lado}{4.6cm}{a barra entra pela frente}{como fica, visto de lado}
 \textbf{Aceite:} braço livre de batente a batente, sem raspar, e a cauda encosta nas duas
 almofadas.\quad
 \textbf{Se falhar:} braço preso \flecha{} colares apertados demais contra os rolamentos
@@ -756,7 +883,6 @@ almofadas.\quad
   \node[bloco, minimum height=26mm, minimum width=15mm] (fonte) at (0,0) {Fonte\\12~V\\$\geq$10~A};
   \node[bloco, minimum width=15mm] (fus) at (2.2,0.7) {Fusível\\10~A};
   \node[no] (j1) at (3.4,0.7) {};
-  \node[bloco, minimum width=21mm] (botao) at (5.0,0.7) {Botão de\\emergência NF};
   \node[no] (j2) at (7.4,0.7) {};
   \node[bloco, minimum height=26mm, minimum width=20mm] (ibt) at (12.1,0) {IBT-2\\(BTS7960)};
   \node[anchor=west, font=\sffamily\tiny] at (11.1,0.7) {B+};
@@ -769,7 +895,7 @@ almofadas.\quad
   \node[no] (estrela) at (10.6,-0.7) {};
   % positivo
   \draw[pot] (0.75,0.7) node[above right, black] {$+$} -- (fus.west);
-  \draw[pot] (fus) -- (j1) -- (botao) -- (j2) -- (11.1,0.7);
+  \draw[pot] (fus) -- (j1) -- (j2) -- (11.1,0.7);
   \draw[pot] (j1) -- (buck.north);
   \draw[pot] (buck) -- (bp) node[midway, above, black] {5~V};
   \draw[pot] (j2) -- (7.4,-2.0) -- (div.west);
@@ -788,29 +914,32 @@ almofadas.\quad
 \end{tikzpicture}
 \caption{Alimentação. Vermelho: positivo de 12~V e 5~V; preto: retornos de potência, todos
   num ponto só no B$-$ do IBT-2; laranja: o conector de sinal entre a Black Pill e o
-  IBT-2 (leva também o GND da lógica). O botão de emergência corta \textbf{só} o ramo do
-  IBT-2: a Black Pill continua ligada e acusa a falha~4 (sem tensão). O divisor mede a
-  tensão \emph{depois} do botão.}
+  IBT-2 (leva também o GND da lógica). O divisor mede a tensão no B+ do IBT-2: se ela cair
+  (fonte fraca ou mau contato), o firmware acusa a falha~4 (sem tensão).}
 \label{fig:alimentacao}
 \end{figure}
 
 \begin{tarefa}[ele]{E1}{Black Pill: gravar e testar os sinais na bancada}{1}{1 h}{---}
+\objetivo{gravar o firmware e testar cada sensor ligado direto na Black Pill, com jumpers,
+\emph{antes} de soldar qualquer coisa. Um defeito achado aqui custa um jumper trocado.}
 \textbf{Material:} Black Pill, ST-Link V2, adaptador USB-serial (jumper em 3,3~V), MPU6050,
 2 sensores ópticos, jumpers fêmea-fêmea, analisador lógico, PC do projeto. Sem 12~V.
+\figil{\ilBlackPill}{Pinos da Black Pill usados no projeto, vista de cima. Os nomes seguem a
+  serigrafia da WeAct V3.x: confira na sua placa antes de ligar.}{fig:blackpill}
 \begin{passos}
   \item Se as barras de pinos vieram soltas, solde-as com a placa encaixada numa protoboard
-    (ficam alinhadas). Solde também o conector SWD de 4 pinos da ponta. Confira com lupa:
-    nenhuma ponte de solda.
-  \item \textbf{ST-Link}: 3V3 \flecha{} 3V3, GND \flecha{} GND, SWDIO \flecha{} DIO,
-    SWCLK \flecha{} CLK. A placa é alimentada só pelo ST-Link. Grave:
+    (assim ficam alinhadas). Solde também o conector SWD de 4 pinos da ponta. Confira com
+    lupa: nenhuma ponte de solda entre pinos vizinhos.
+  \item \textbf{ST-Link} (figura~\ref{fig:ligacoes}, a): 4 jumpers. A placa é alimentada só
+    pelo ST-Link. Grave:
 \begin{comandos}
 \begin{verbatim}
 cd firmware && pio run -t upload && cd ..     # tem que terminar com "Verified OK"
 \end{verbatim}
 \end{comandos}
   \item O LED da placa (PC13) dá uma piscada curta por segundo: estado PARADO.
-  \item \textbf{Serial}: GND \flecha{} GND, RX do adaptador \flecha{} PA2, TX do adaptador
-    \flecha{} PA3. O VCC do adaptador fica sem ligar.
+  \item \textbf{Serial} (figura~\ref{fig:ligacoes}, b): GND, e TX e RX \textbf{cruzados}
+    (quem transmite liga em quem recebe). O VCC do adaptador fica sem ligar.
 \begin{comandos}
 \begin{verbatim}
 ls /dev/ttyUSB* /dev/ttyACM*                   # descobre a porta
@@ -819,16 +948,38 @@ python tools/telemetry_log.py --porta /dev/ttyUSB0
 \end{comandos}
     Digite \cmd{diag}: a linha do relógio tem que dizer \cmd{cristal 25 MHz}. Um erro do
     MPU6050 é esperado (ainda não está ligado).
-  \item \textbf{MPU6050} (placa sem energia ao ligar): VCC \flecha{} 3V3, GND \flecha{} GND,
-    SCL \flecha{} PB6, SDA \flecha{} PB7; AD0 e INT sem ligar. Religue: \cmd{diag} mostra
-    \cmd{WHO_AM_I=0x68} (0x70, 0x72 e 0x98 também servem) e \cmd{erros_i2c=0}. Com a seta Y
-    do módulo para cima, a aceleração em y fica perto de +1~g.
-  \item \textbf{Sensores ópticos}: VCC \flecha{} 3V3, GND \flecha{} GND, D0 do sensor~A
-    \flecha{} PA15, D0 do sensor~B \flecha{} PB3; A0 sem ligar. Passe um cartão na fenda:
-    o LED do módulo pisca e a contagem do encoder (\cmd{diag}) muda.
+  \item \textbf{MPU6050} (figura~\ref{fig:ligacoes}, c), \textbf{com a placa desligada}
+    (tire o ST-Link do USB). Religue: \cmd{diag} mostra \cmd{WHO_AM_I=0x68} (0x70, 0x72 e
+    0x98 também servem) e \cmd{erros_i2c=0}. Com a seta Y do módulo para cima, a aceleração
+    em y fica perto de +1~g.
+  \item \textbf{Sensores ópticos} (figura~\ref{fig:ligacoes}, d), também com a placa
+    desligada. Religue e passe um cartão na fenda de cada sensor: o LED do módulo pisca e
+    a contagem do encoder (\cmd{diag}) muda.
   \item Opcional: no PulseView (canal 0 em PA15, canal 1 em PB3, GND comum, 1~MHz), as bordas
     são limpas, sem repiques.
 \end{passos}
+\begin{center}
+  \begin{minipage}[t]{0.48\linewidth}
+    \ilLigacao{(a) ST-Link V2}{4}{3.3V/3V3 (SWD)/red, GND/GND (SWD)/black,
+      SWDIO/DIO (SWD)/yellow!70!black, SWCLK/CLK (SWD)/green!50!black}{a placa é alimentada
+      pelo ST-Link. SWDIO e SWCLK trocados é o erro mais comum.}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\linewidth}
+    \ilLigacao{(b) adaptador USB-serial}{4}{GND/G/black, RX/A2 (PA2)/orange,
+      TX/A3 (PA3)/orange!60!black, VCC/não ligar/black!12}{jumper do adaptador em 3,3~V. O RX
+      do adaptador recebe o que a placa transmite pelo PA2.}
+  \end{minipage}\\[3mm]
+  \begin{minipage}[t]{0.48\linewidth}
+    \ilLigacao{(c) MPU6050 (GY-521)}{4}{VCC/3V3/red, GND/G/black, SCL/B6 (PB6)/green!50!black,
+      SDA/B7 (PB7)/green!70!black}{XDA, XCL, AD0 e INT sem ligar.}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\linewidth}
+    \ilLigacao{(d) 2 sensores ópticos}{4}{VCC (os 2)/3V3/red, GND (os 2)/G/black,
+      D0 do sensor A/A15 (PA15)/violet, D0 do sensor B/B3 (PB3)/violet!60!black}{A0 dos
+      sensores sem ligar.}
+  \end{minipage}
+  \captionof{figure}{Ligações de bancada do E1, uma de cada vez.}\label{fig:ligacoes}
+\end{center}
 \textbf{Aceite:} \cmd{Verified OK}; LED piscando uma vez por segundo; \cmd{cristal 25 MHz};
 MPU6050 e os dois sensores respondendo.
 
@@ -846,109 +997,128 @@ MPU6050 e os dois sensores respondendo.
 \end{tarefa}
 
 \begin{tarefa}[ele]{E2}{Desenhar a placa perfurada}{1}{45 min}{---}
-\textbf{Material:} papel quadriculado (um quadrado = 2,54~mm), a placa perfurada, as barras
-fêmea, os bornes.
-
-Desenhe antes de soldar: a placa perfurada é onde mora a Black Pill (num soquete, para
-poder sair) e de onde saem todos os conectores.
+\objetivo{planejar no papel a placa onde a Black Pill fica encaixada (num soquete, para poder
+sair) e de onde saem todos os conectores. Desenhar antes evita fio cruzado e ponte de solda.}
+\textbf{Material:} papel quadriculado (um quadrado = 2,54~mm, o passo da placa), a placa
+perfurada, as barras fêmea, os bornes.
+\figil{\resizebox{\linewidth}{!}{\ilPlaca}}{Mapa de ligações da placa perfurada. Etiquetas iguais são o mesmo fio: faça
+  um barramento de 3V3 e um de GND e ligue nele todos os 3V3 e todos os GND.}{fig:placa}
 \begin{passos}
-  \item Posicione as 2 barras fêmea 1 $\times$ 20 da Black Pill, deixando livre o conector
-    SWD de 4 pinos na ponta (ST-Link).
-  \item Desenhe os conectores, todos com etiqueta:
+  \item Desenhe as 2 barras fêmea 1 $\times$ 20 do soquete, na mesma distância das fileiras de
+    pinos da Black Pill (encaixe a placa sobre a perfurada para contar os furos). Deixe livre
+    a ponta do conector SWD (o ST-Link precisa encaixar).
+  \item Ponha cada conector na borda mais perto dos pinos que ele usa
+    (figuras~\ref{fig:blackpill} e~\ref{fig:placa}):
     \begin{itemize}
-      \item entrada de 5~V do buck (2 vias: 5V, GND);
-      \item IBT-2 (5 vias usadas: 3V3 \flecha{} VCC, GND, PB10 \flecha{} R\_EN e L\_EN juntos,
-        PB0 \flecha{} RPWM, PB1 \flecha{} LPWM; R\_IS e L\_IS sem ligar);
-      \item MPU6050 (4 vias: 3V3, GND, SCL = PB6, SDA = PB7);
-      \item sensores ópticos (4 vias: 3V3, GND, A = PA15, B = PB3);
-      \item serial (3 vias: GND, PA2, PA3);
-      \item tensão do barramento (1 via: B+ depois do botão).
+      \item do lado da fileira com B6, B7, A15 e B3: MPU6050 (4 vias) e sensores (4 vias);
+      \item do lado da fileira com A2, A3, A4, B0, B1 e B10: serial (3 vias), B+ do divisor
+        (1 via) e IBT-2 (5 vias);
+      \item perto dos pinos 5V e G: a entrada do buck (2 vias).
     \end{itemize}
-  \item Componentes: divisor \qty{10}{\kilo\ohm} (da via ``B+'' até PA4) e
-    \qty{2,2}{\kilo\ohm} (de PA4 ao GND), com o \qty{100}{\nano\farad} de PA4 ao GND
-    \textbf{junto ao pino}; pull-down de \qty{10}{\kilo\ohm} de PB10 ao GND.
-  \item Todos os GNDs da lógica num barramento. Um único fio de GND sai da placa para o
-    ponto de terra (B$-$ do IBT-2), junto com os fios de sinal do IBT-2.
-  \item Mantenha o divisor e o PA4 longe do caminho dos fios do motor.
+  \item Desenhe os componentes:
+    \begin{itemize}
+      \item divisor do barramento: \qty{10}{\kilo\ohm} da via ``B+'' até A4,
+        \qty{2,2}{\kilo\ohm} de A4 ao GND e o \qty{100}{\nano\farad} de A4 ao GND
+        \textbf{junto ao pino};
+      \item pull-down: \qty{10}{\kilo\ohm} de B10 ao GND (mantém a ponte desligada enquanto a
+        placa reinicia).
+    \end{itemize}
+  \item Um barramento de 3V3 e um de GND. Um único fio de GND sai da placa para o ponto de
+    terra (B$-$ do IBT-2), junto com os fios de sinal do IBT-2.
+  \item Mantenha o divisor e o pino A4 longe do caminho dos fios do motor.
   \item Confira cada ligação contra a tabela~\ref{tab:pinagem} (apêndice).
 \end{passos}
 \textbf{Aceite:} desenho conferido por uma segunda pessoa.
 \end{tarefa}
 
 \begin{tarefa}[ele]{E3}{Montar a placa perfurada}{1}{2 h}{E2}
+\objetivo{transformar o desenho do E2 na placa de verdade.}
 \textbf{Material:} placa perfurada, barras fêmea, bornes ou barras de pinos para os
 conectores, resistores (2 $\times$ \qty{10}{\kilo\ohm}, 1 $\times$ \qty{2,2}{\kilo\ohm}),
 1 capacitor de \qty{100}{\nano\farad}, fio de 22 a 24~AWG, ferro a 330--350~°C.
 \begin{passos}
   \item \textbf{Soquete}: encaixe as barras fêmea nos pinos da Black Pill, ponha o conjunto
-    na placa perfurada e solde as barras com a Black Pill encaixada (ficam alinhadas). Depois
-    retire a Black Pill e guarde-a longe do ferro.
-  \item Solde os conectores conforme o desenho do E2.
-  \item Solde o divisor do barramento, o capacitor de PA4 e o pull-down do PB10.
+    na placa perfurada e solde as barras com a Black Pill encaixada (assim ficam
+    alinhadas). Depois retire a Black Pill e guarde-a longe do ferro.
+  \item Solde os conectores nos lugares do desenho.
+  \item Solde o divisor do barramento, o capacitor de A4 e o pull-down de B10.
   \item Faça as ligações por baixo, com fio fino ou com o próprio estanho entre ilhas
-    vizinhas. Corte as sobras das pernas.
+    vizinhas, seguindo o desenho e riscando cada ligação feita. Corte as sobras das pernas.
   \item Inspeção: lupa em todas as soldas (nenhuma ponte); multímetro em continuidade entre
-    cada pino do soquete e o conector correspondente.
+    cada furo do soquete e o pino do conector correspondente.
 \end{passos}
-\textbf{Aceite:} sem pontes de solda; PB10--GND \aprox{} \qty{10}{\kilo\ohm};
-PA4--GND \aprox{} \qty{2,2}{\kilo\ohm}; 3V3 e GND sem curto; ligações conferidas por uma
+\textbf{Aceite:} sem pontes de solda; B10--GND \aprox{} \qty{10}{\kilo\ohm};
+A4--GND \aprox{} \qty{2,2}{\kilo\ohm}; 3V3 e GND sem curto; ligações conferidas por uma
 segunda pessoa.
 \end{tarefa}
 
 \begin{tarefa}[ele]{E4}{Potência e proteções}{1}{1 h}{---}
-\textbf{Material:} fonte, porta-fusível e fusível de 10~A, botão de emergência NF, 2
-eletrolíticos de \qty{4700}{\micro\farad}/35~V, 1 cerâmico de \qty{100}{\nano\farad}, TVS
-SMBJ15A, fio de 14~AWG, termo-retrátil, um pedaço de placa perfurada com 2 bornes.
+\objetivo{montar o caminho da corrente do motor: fonte, fusível, IBT-2, e a placa de proteção
+que segura os picos de tensão.}
+\textbf{Material:} fonte, porta-fusível e fusível de 10~A, 2 eletrolíticos de
+\qty{4700}{\micro\farad}/35~V, 1 cerâmico de \qty{100}{\nano\farad}, TVS SMBJ15A, fio de
+14~AWG, termo-retrátil, um pedaço de placa perfurada com 2 bornes.
 
 Siga a figura~\ref{fig:alimentacao}. Todos os fios de potência são de 14~AWG.
 \begin{passos}
   \item \textbf{Fusível}: logo na saída do positivo da fonte.
-  \item \textbf{Botão de emergência} (NF) em série \textbf{só} no ramo que vai ao B+ do IBT-2.
-    A entrada do buck sai de \emph{antes} do botão.
-  \item \textbf{Placa de proteção do barramento}: num pedaço de placa perfurada com 2 bornes,
-    solde os 2 eletrolíticos (\textbf{faixa ``$-$'' no lado do B$-$}), o
-    \qty{100}{\nano\farad} e a TVS SMBJ15A com o \textbf{catodo (faixa) no B+}. Ela fica
-    encostada nos bornes B+ e B$-$ do IBT-2, com fios de no máximo 5~cm.
+  \item Do fusível saem dois ramos: um vai direto ao B+ do IBT-2, o outro à entrada IN+ do
+    buck.
+  \item \textbf{Placa de proteção do barramento} (figura~\ref{fig:protecao}): num pedaço de
+    placa perfurada com 2 bornes, solde
+    \begin{itemize}
+      \item os 2 eletrolíticos, com a \textbf{faixa ``$-$'' no lado do B$-$};
+      \item o \qty{100}{\nano\farad} (não tem polaridade);
+      \item a TVS SMBJ15A com a \textbf{faixa (catodo) no B+}.
+    \end{itemize}
+    Ela fica encostada nos bornes B+ e B$-$ do IBT-2, com fios de no máximo 5~cm.
   \item \textbf{Terra em estrela}: o negativo da fonte vai direto ao B$-$ do IBT-2. Dali saem
     o IN$-$ do buck, o negativo da placa de proteção e o GND da lógica (que vai junto com os
     fios de sinal do IBT-2).
-  \item Um fio fino do B+ \emph{depois do botão} até a via ``B+'' do divisor na placa
-    perfurada.
+  \item Um fio fino do B+ do IBT-2 até a via ``B+'' do divisor na placa perfurada.
   \item Isole todas as emendas com termo-retrátil.
 \end{passos}
+\figil{\ilProtecao}{Placa de proteção do barramento, vista de cima. Eletrolítico ou TVS
+  invertido explode ou entra em curto ao ligar a fonte.}{fig:protecao}
 \textbf{Aceite:} ligações conferidas contra a figura~\ref{fig:alimentacao} por uma segunda
-pessoa; com a fonte desligada, o botão solto dá continuidade e apertado abre.
+pessoa.
 
 \textbf{Se o fio de 14~AWG não bastar} (50~cm de cada cor é pouco para fonte \flecha{}
-fusível \flecha{} botão \flecha{} B+ e o chicote do motor): fio de 16~AWG serve nos trechos
-da fonte até o botão, se forem curtos.
+fusível \flecha{} B+ e o chicote do motor): fio de 16~AWG serve no trecho da fonte até o
+fusível, se for curto.
 \end{tarefa}
 
 \begin{tarefa}[ele]{E5}{Ajustar o buck e energizar sem a Black Pill}{1}{30 min}{E3 e E4}
+\objetivo{deixar o buck em 5,0~V e conferir as tensões da placa \emph{sem} a Black Pill no
+soquete: um erro aqui não queima nada caro.}
 \begin{passos}
   \item Multímetro em continuidade, fonte desligada: sem curto entre 12~V e GND, 5~V e GND,
     3V3 e GND. Nos eletrolíticos a leitura sobe aos poucos: é a carga deles, não é curto.
   \item Com a saída do buck \textbf{desligada} da placa perfurada, ligue a fonte e gire o
-    trimpot do buck até \textbf{5,00~V} na saída, sem carga. Desligue.
+    trimpot do buck até \textbf{5,00~V} na saída, sem carga (figura~\ref{fig:buck}).
+    Desligue.
   \item Ligue a saída do buck na entrada de 5~V da placa perfurada, \textbf{sem a Black Pill
-    no soquete}, e ligue a fonte. Meça:
+    no soquete}, e ligue a fonte. Meça (ponta preta no GND):
     \begin{checklist}
       \item B+ do IBT-2 \aprox{} 12~V;
-      \item pino 5V do soquete = 5,0~V;
-      \item pino PA4 do soquete \aprox{} 2,16~V ($12 \times 2{,}2 / 12{,}2$);
-      \item apertando o botão de emergência, PA4 cai devagar para 0 (os capacitores
-        descarregam pelo divisor).
+      \item furo 5V do soquete = 5,0~V;
+      \item furo A4 do soquete \aprox{} 2,16~V ($12 \times 2{,}2 / 12{,}2$).
     \end{checklist}
   \item Desligue a fonte e espere os capacitores descarregarem antes de mexer nos bornes.
 \end{passos}
+\figil{\ilBuck}{Ajuste do buck: multímetro na saída, nada mais ligado nela.}{fig:buck}
 \textbf{Aceite:} 5,0~V, 12~V e 2,16~V medidos.\quad
-\textbf{Se falhar:} PA4 errado \flecha{} resistores trocados ou mal soldados; 5~V instável
+\textbf{Se falhar:} A4 errado \flecha{} resistores trocados ou mal soldados; 5~V instável
 \flecha{} buck com defeito ou trimpot no fim do curso.
 \end{tarefa}
 
 \begin{tarefa}[ele]{E6}{Chicotes de sinal do braço}{1}{45 min}{E2 e M10 (para medir)}
-\textbf{Material:} fio de 22 a 24~AWG, conectores (ou barras de pinos e jumpers), termo-retrátil,
-etiquetas.
+\objetivo{fazer os fios que levam os sinais do MPU6050 e dos sensores, no braço, até a placa
+perfurada, na bandeja, sem atrapalhar o movimento do braço.}
+\textbf{Material:} fio de 22 a 24~AWG, conectores (ou barras de pinos e jumpers),
+termo-retrátil, etiquetas.
+\figil{\ilChicotes}{Caminho dos fios, com o braço visto por trás: o chicote do motor desce de
+  um lado e os de sinal do outro, com um laço folgado perto do pivô.}{fig:chicotes}
 \begin{passos}
   \item Meça os dois percursos com o braço no pivô, inclinado de batente a batente: da placa
     perfurada (na bandeja) até o MPU6050 (atrás do braço, 48~mm acima do pivô) e até os
@@ -956,9 +1126,10 @@ etiquetas.
   \item \textbf{MPU6050}: 4 fios (3V3, GND, SCL, SDA) trançados juntos.
   \item \textbf{Sensores}: 4 fios (3V3, GND, A, B), divididos na ponta para os dois módulos
     (3V3 e GND vão aos dois; A só ao sensor~A, B só ao sensor~B).
-  \item Conectores nas duas pontas: o braço precisa sair sem dessoldar nada.
-    Termo-retrátil em todas as emendas e etiqueta em cada ponta.
-  \item Planeje os chicotes de sinal do lado do braço \textbf{oposto} ao do chicote do motor.
+  \item Conectores nas duas pontas: o braço precisa sair sem dessoldar nada. Termo-retrátil
+    em todas as emendas e etiqueta em cada ponta.
+  \item Os chicotes de sinal descem pelo lado do braço \textbf{oposto} ao do chicote do motor
+    (figura~\ref{fig:chicotes}): o motor faz ruído e o I2C do MPU6050 é sensível a ele.
 \end{passos}
 \textbf{Aceite:} continuidade de ponta a ponta em cada fio; etiquetas no lugar.
 \end{tarefa}
@@ -968,34 +1139,38 @@ etiquetas.
 \label{sec:integracao}
 
 \begin{tarefa}[int]{I1}{Eletrônica na bandeja e fiação}{2}{1 h}{M10, E5 e E6}
+\objetivo{juntar as duas trilhas: módulos presos na bandeja e todos os fios ligados.}
 \textbf{Material:} bandeja (na base ou solta), placa perfurada, IBT-2, buck, placa de
 proteção do barramento, parafusos M3 com porca e espaçadores, abraçadeiras.
+\figil{\ilBandeja}{Sugestão de disposição na bandeja, vista de cima. Ajuste ao tamanho real das
+  placas.}{fig:bandeja}
 \begin{passos}
-  \item Distribua os módulos na grade de furos da bandeja (passo de 10~mm), \emph{antes} de
-    parafusar: IBT-2 numa ponta, com a placa de proteção junto aos bornes B+ e B$-$; placa
-    perfurada na outra ponta, com o conector SWD e o da serial virados para fora; buck no
-    meio ou junto à placa perfurada. A passagem central da bandeja serve para os fios.
+  \item Distribua os módulos na grade de furos da bandeja (passo de 10~mm) \emph{antes} de
+    parafusar (figura~\ref{fig:bandeja}): IBT-2 numa ponta, com a placa de proteção junto
+    aos bornes B+ e B$-$; placa perfurada na outra ponta, com o conector SWD e o da serial
+    virados para fora; buck no meio. A passagem central da bandeja serve para os fios.
   \item Prenda cada módulo com M3, porca e espaçador (a solda de baixo não pode encostar na
     bandeja). Bandeja nas colunas com os 4 M3 $\times$ 8, se ainda não estiver.
-  \item \textbf{Motor}: chicote do motor desce pelo braço, passa perto do pivô e vai aos
-    bornes M+ e M$-$ do IBT-2. Prenda-o ao braço com abraçadeiras.
+  \item \textbf{Motor}: o chicote desce pelo braço, passa perto do pivô e vai aos bornes M+ e
+    M$-$ do IBT-2 (figura~\ref{fig:chicotes}). Prenda-o ao braço com abraçadeiras.
   \item \textbf{Sinais}: chicotes do MPU6050 e dos sensores pelo \textbf{outro lado} do
     braço, longe do chicote do motor. Encaixe nos módulos e na placa perfurada.
   \item \textbf{Folga no pivô}: deixe um laço de fio perto do pivô. Incline o braço de um
     batente ao outro várias vezes: nenhum fio estica, raspa na roda ou trava o braço.
-  \item Fonte, fusível e botão de emergência \textbf{fora da base}, ao alcance da mão de quem
-    opera o PC.
+  \item Fonte e fusível \textbf{fora da base}, ao alcance da mão de quem opera o PC.
 \end{passos}
-\textbf{Aceite:} nada solto; braço livre com os fios; botão alcançável.
+\textbf{Aceite:} nada solto; braço livre com os fios.
 \end{tarefa}
 
 \begin{tarefa}[int]{I2}{Conferência antes de ligar}{2 (quem montou e outra pessoa)}{20 min}{I1}
-Fonte desligada da tomada. Uma pessoa lê, outra mede e risca.
+\objetivo{achar erro de ligação com a fonte fora da tomada, quando ele ainda não queima nada.}
+Uma pessoa lê, a outra mede e risca.
 \begin{checklist}
   \item sem curto entre 12~V e GND, 5~V e GND, 3V3 e GND (pinos do soquete);
   \item fusível no positivo, logo depois da fonte;
-  \item botão de emergência só no ramo do B+ do IBT-2; o buck sai de antes dele;
-  \item TVS com a faixa no B+; eletrolíticos com o ``$-$'' no B$-$;
+  \item do fusível, um ramo direto ao B+ do IBT-2 e outro ao buck;
+  \item TVS com a faixa no B+; eletrolíticos com o ``$-$'' no B$-$
+    (figura~\ref{fig:protecao});
   \item todos os negativos de potência no B$-$ do IBT-2 (estrela);
   \item buck ajustado em 5,0~V (E5);
   \item MPU6050, sensores e VCC do IBT-2 no 3V3, nunca no 5V;
@@ -1009,7 +1184,8 @@ Fonte desligada da tomada. Uma pessoa lê, outra mede e risca.
 \end{tarefa}
 
 \begin{tarefa}[int]{I3}{Primeira energização e conferência dos sensores}{2}{45 min}{I2}
-Com a roda montada, mas o motor sem comando (o firmware começa em PARADO). Óculos.
+\objetivo{ligar tudo pela primeira vez e conferir que cada sensor mede o que deve, com o motor
+ainda sem comando (o firmware começa em PARADO). Óculos.}
 \begin{passos}
   \item Encaixe a Black Pill no soquete. Ligue o ST-Link e o adaptador USB-serial no PC.
     Ligue a fonte.
@@ -1026,39 +1202,42 @@ Com a roda montada, mas o motor sem comando (o firmware começa em PARADO). Ócu
     giroscópio concorda com o ângulo. Se não, \cmd{inv giro} e depois fixe em \arq{board.h}.
   \item Encoste o braço em cada batente: \cmd{theta_graus} marca de $\pm$22° a $\pm$25°.
   \item \textbf{Encoder}: gire a roda devagar com a mão; os LEDs dos dois sensores piscam.
-    Faça uma marca na roda e dê \textbf{uma volta exata}: a contagem \cmd{encoder} muda
-    \textbf{160 $\pm$ 2}. Volte a roda: a contagem volta ao valor inicial.
+    Faça uma marca de caneta na roda e no braço e dê \textbf{uma volta exata}: a contagem
+    \cmd{encoder} muda \textbf{160 $\pm$ 2}. Volte a roda: a contagem volta ao valor
+    inicial.
 \end{passos}
+\figil{\ilQuadratura}{Por que 160: são 40 dentes, e cada borda de subida e de descida dos dois
+  sensores conta (40 $\times$ 4). Para isso os sensores ficam a 1\,\textonequarter{} dente um
+  do outro.}{fig:quadratura}
 \textbf{Aceite:} \cmd{vbus} a $\pm$3\,\% do multímetro; MPU6050 com +1~g em y e
 \cmd{erros_i2c=0}; $\pm$22--25° nos batentes; 160 contagens por volta.
 
 \textbf{Se falhar:}
 \begin{itemize}
-  \item 40 ou 80 contagens, ou a contagem vai e volta \flecha{} sensores fora de quadratura:
-    afrouxe um sensor e deslize-o no rasgo da prateleira (alguns décimos de milímetro);
-  \item \cmd{vbus} \aprox{} 0 \flecha{} fio do B+ até o divisor solto, ou botão apertado;
+  \item 40 ou 80 contagens, ou a contagem vai e volta \flecha{} sensores fora de quadratura
+    (figura~\ref{fig:quadratura}): afrouxe um sensor e deslize-o no rasgo da prateleira
+    (alguns décimos de milímetro);
+  \item \cmd{vbus} \aprox{} 0 \flecha{} fio do B+ até o divisor solto;
   \item \cmd{erros_i2c} sobe com o braço parado \flecha{} mau contato no chicote do MPU6050.
 \end{itemize}
 \end{tarefa}
 
-\begin{tarefa}[int]{I4}{Motor sem roda e botão de emergência}{2}{40 min}{I3}
-É a etapa~4 de \arq{docs/testes_bancada.md}. Óculos e mão no botão de emergência.
+\begin{tarefa}[int]{I4}{Motor sem roda}{2}{40 min}{I3}
+\objetivo{ver o motor girar pela primeira vez, sem a roda, e conferir que o ruído dele não
+atrapalha o MPU6050. É a etapa~4 de \arq{docs/testes_bancada.md}.} Óculos e terminal pronto
+para mandar \cmd{s}.
 \begin{passos}
-  \item Desligue a fonte. Tire a roda: solte os 4 parafusos M3 $\times$ 8 do flange (o flange
-    fica no eixo). Segure o braço em pé com um sargento contra a base ou com a mão.
+  \item Desligue a fonte. Tire a roda: solte os 4 parafusos M3 $\times$ 8 por trás do flange
+    (o flange fica no eixo). Segure o braço em pé com um sargento contra a base ou com a mão.
   \item Ligue a fonte. \cmd{m 10}: o motor gira devagar. \cmd{s} para. \cmd{m -10}: gira ao
     contrário. \cmd{s}.
   \item \cmd{m 30} por 5~s e depois \cmd{diag}: \textbf{\cmd{erros_i2c} não pode subir}.
-  \item Com o motor girando (\cmd{m 20}), aperte o botão de emergência: o firmware acusa
-    ``sem tensao'' (falha~4: o LED dá 4 piscadas a cada 3~s). Solte o botão; \cmd{s} volta a
-    PARADO.
   \item O ensaio em malha aberta desliga sozinho 15~s depois do primeiro \cmd{m}: é normal.
     Para continuar, \cmd{s} e um novo \cmd{m}.
   \item Desligue a fonte e recoloque a roda com os 4 M3 $\times$ 8, em cruz. Gire com a mão
     para conferir que não bate.
 \end{passos}
-\textbf{Aceite:} o motor gira nos dois sentidos; \cmd{erros_i2c} parado; o botão provoca a
-falha~4.
+\textbf{Aceite:} o motor gira nos dois sentidos; \cmd{erros_i2c} parado.
 
 \textbf{Se falhar:}
 \begin{itemize}
@@ -1067,31 +1246,37 @@ falha~4.
     do buck);
   \item \cmd{erros_i2c} sobe \flecha{} capacitores do motor (M5), fios do motor trançados e
     afastados do chicote do MPU6050, chicote do I2C mais curto;
-  \item falha~4 sem apertar o botão \flecha{} fonte fraca (cai abaixo de 9~V na partida) ou mau
-    contato no fusível ou no botão.
+  \item falha~4 \flecha{} fonte fraca (cai abaixo de 9~V na partida) ou mau contato no
+    fusível ou no B+.
 \end{itemize}
 \end{tarefa}
 
 \begin{tarefa}[int]{I5}{Proteção e aceite da montagem}{2}{20 min}{I4 e M3}
+\objetivo{pôr a proteção de policarbonato e conferir a montagem inteira.}
 \begin{passos}
-  \item Tire a película do policarbonato, encaixe a placa nas ranhuras dos dois postes (a
-    borda com os furos para baixo) e aperte os 2 parafusos M3 $\times$ 16, que entram pela
-    frente e rosqueiam nos insertos de trás.
+  \item Tire a película do policarbonato e desça a placa nas ranhuras dos dois postes, com a
+    borda dos furos para baixo (figura~\ref{fig:protecaopol}).
+  \item Aperte os 2 parafusos M3 $\times$ 16: eles entram pela frente dos postes, atravessam a
+    placa e rosqueiam nos insertos de trás.
   \item Confira a lista de aceite abaixo e fotografe o conjunto de frente, de lado e de trás.
 \end{passos}
+\figil{\includegraphics[height=4.4cm]{exp_protecao}}{A placa desce nas ranhuras dos postes e
+  é presa pelos 2 parafusos M3 da frente.}{fig:protecaopol}
 \begin{checklist}
   \item base presa na mesa; braço livre de batente a batente, com os fios;
   \item roda gira livre e não bate; parafusos M8 apertados;
   \item proteção no lugar, entre a roda e quem opera;
   \item LED PARADO ao ligar; \cmd{diag} sem erros; \cmd{vbus} certo;
   \item 160 contagens por volta; $\pm$22--25° nos batentes;
-  \item motor nos dois sentidos; botão de emergência provoca a falha~4;
+  \item motor nos dois sentidos;
   \item toda inversão feita pela serial (\cmd{inv}) fixada em \arq{board.h} e gravada.
 \end{checklist}
 \textbf{Aceite:} lista completa.
 \end{tarefa}
 
 \begin{tarefa}[int]{I6}{Massas no modelo e gravação final}{1}{20 min}{I5 e M2}
+\objetivo{passar as medidas para o modelo, para os ganhos do controle saírem com as massas
+reais, e gravar o firmware final.}
 \begin{passos}
   \item Passe os valores da tabela~\ref{tab:medidas} para \arq{sim/params.py}:
     \begin{itemize}
@@ -1242,7 +1427,7 @@ $N$ piscadas a cada 3~s & FALHA número $N$ \\
 \end{table}
 
 Falhas: 1, inclinação acima de 20°; 2, roda acima de 2000~rpm; 3, MPU6050 sem resposta;
-4, sem tensão (botão de emergência, fusível ou fonte); 5, sobretensão (energia da
+4, sem tensão (fonte fraca ou mau contato); 5, sobretensão (energia da
 frenagem); 6, motor travado (corrente no limite por 1~s). Em qualquer falha a roda é
 freada, e \cmd{s} (ou o botão KEY) volta a PARADO.
 
@@ -1283,7 +1468,7 @@ nada na serial & TX e RX trocados; adaptador em 5~V & trocar; jumper em 3,3~V \\
 motor parado com PWM presente & IBT-2 não aceita 3,3~V & VCC do IBT-2 em 5~V \\
 \cmd{erros_i2c} sobe com o motor & ruído do motor & capacitores no motor; fios trançados e
   afastados; I2C curto \\
-falha~4 sem apertar o botão & fonte fraca ou mau contato & conferir fusível, botão e
+falha~4 & fonte fraca ou mau contato & conferir fusível e
   bornes; fonte de 10~A ou mais \\
 falha~5 ao frear & energia da frenagem & fonte chaveada (nunca ATX); TVS e capacitores
   perto do IBT-2 \\
