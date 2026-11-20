@@ -1,0 +1,8 @@
+numpy>=1.26,<3
+scipy>=1.11
+control>=0.10
+sympy>=1.12
+matplotlib>=3.8
+pyserial>=3.5
+trimesh>=4.0
+pytest>=8.0

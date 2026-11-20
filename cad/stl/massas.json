@@ -1,0 +1,64 @@
+{
+  "roda": {
+    "estanque": true,
+    "volume_cm3": 68.07539482550607,
+    "massa_g": 73.4873887141338,
+    "dimensoes_mm": [
+      131.8,
+      131.8,
+      12.0
+    ],
+    "I_eixo_gm2": 0.16471777971333704
+  },
+  "braco": {
+    "estanque": true,
+    "volume_cm3": 55.47103000940331,
+    "massa_g": 52.83615608395666,
+    "dimensoes_mm": [
+      56.5,
+      164.2,
+      34.0
+    ],
+    "cm_ao_longo_mm": 36.5232556726035
+  },
+  "suporte_sensores": {
+    "estanque": true,
+    "volume_cm3": 9.99719859708,
+    "massa_g": 11.42679799646244,
+    "dimensoes_mm": [
+      76.2,
+      28.0,
+      20.4
+    ]
+  },
+  "base": {
+    "estanque": true,
+    "volume_cm3": 331.67155918077333,
+    "massa_g": 189.55029607181194,
+    "dimensoes_mm": [
+      170.0,
+      185.0,
+      67.0
+    ]
+  },
+  "bandeja": {
+    "estanque": true,
+    "volume_cm3": 26.794529694905226,
+    "massa_g": 20.417431627517782,
+    "dimensoes_mm": [
+      150.0,
+      66.0,
+      3.0
+    ]
+  },
+  "batente_tpu": {
+    "estanque": true,
+    "volume_cm3": 1.8052511464610657,
+    "massa_g": 2.1843538872178896,
+    "dimensoes_mm": [
+      37.8,
+      16.0,
+      3.0
+    ]
+  }
+}

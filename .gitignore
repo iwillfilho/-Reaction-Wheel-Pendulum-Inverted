@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# PlatformIO
+firmware/.pio/
+
+# LaTeX (intermediários)
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.synctex.gz
+
+# Cópias e arquivos pessoais
+cad/pecas_impressao_3d.zip
+Materiais_trabalho_de_sec - Planilha1.pdf
+
+# Ferramentas do Claude Code
+.agents/
+.claude/
+skills-lock.json

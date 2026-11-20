@@ -1,0 +1,2152 @@
+% =====================================================================
+% Plano de execução acelerado: pêndulo invertido com roda de reação
+% (WeAct Black Pill STM32F411CEU6, motor 775, controle LQR).
+%
+% Para o grupo executar: passo a passo, frentes em paralelo, caminho
+% crítico e configuração final do hardware.
+%
+% Compilar:  cd plano && latexmk -pdf plano_execucao.tex
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage[a4paper,top=2.4cm,bottom=2.2cm,left=2cm,right=2cm,headheight=14pt]{geometry}
+\usepackage{microtype}
+\DisableLigatures[-]{encoding=*, family=tt*}
+\usepackage{amsmath,amssymb}
+\usepackage{siunitx}
+\usepackage[table]{xcolor}
+\usepackage{booktabs,array,tabularx,xltabular}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, hypcap=false}
+\captionsetup[table]{position=top}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage{pifont}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,patterns}
+\usepackage{pgfgantt}
+\usepackage{pdflscape}
+\usepackage[skins,breakable]{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{needspace}
+\usepackage[hidelinks]{hyperref}
+
+\sisetup{
+  output-decimal-marker = {,},
+  group-separator = {.},
+  group-minimum-digits = 5,
+  per-mode = symbol,
+  exponent-product = \cdot,
+}
+\DeclareSIUnit\rpm{rpm}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt plus 1pt}
+\renewcommand{\arraystretch}{1.15}
+
+% ---- cores --------------------------------------------------------------
+\definecolor{critico}{RGB}{190,30,45}
+\definecolor{azul}{RGB}{31,94,165}
+\definecolor{verde}{RGB}{30,125,70}
+\definecolor{cinza}{RGB}{100,100,100}
+
+% ---- cabeçalho e rodapé ----------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily Plano de execução acelerado}
+\fancyhead[R]{\small\sffamily Pêndulo com roda de reação}
+\fancyfoot[C]{\small\sffamily\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---- atalhos ----------------------------------------------------------------
+\newcommand{\cmd}[1]{\texttt{\detokenize{#1}}}   % comando ou identificador
+\newcommand{\arq}[1]{\path{#1}}                    % caminho de arquivo (quebra em /)
+\newcommand{\flecha}{\ensuremath{\rightarrow}}
+\newcommand{\aprox}{\ensuremath{\approx}}
+\newcommand{\caixa}{\ensuremath{\square}}
+\newcommand{\linha}[1][2.6cm]{\rule{#1}{0.4pt}}
+
+% ---- listas -------------------------------------------------------------------
+\setlist{itemsep=1pt, topsep=3pt, parsep=0pt}
+\newlist{passos}{enumerate}{2}
+\setlist[passos,1]{label=\arabic*., leftmargin=1.7em, itemsep=2pt, topsep=2pt}
+\setlist[passos,2]{label=\alph*), leftmargin=1.5em}
+\newlist{checklist}{itemize}{2}
+\setlist[checklist]{label=\caixa, leftmargin=1.6em, itemsep=1pt, topsep=2pt}
+
+% ---- caixas -------------------------------------------------------------------
+\tcbset{
+  basetarefa/.style={
+    enhanced, breakable,
+    colback=white, colframe=azul!80!black,
+    colbacktitle=azul!80!black, coltitle=white,
+    fonttitle=\sffamily\bfseries\small,
+    boxrule=0.6pt, arc=1.5pt,
+    left=5pt, right=5pt, top=3pt, bottom=4pt,
+    before skip=8pt, after skip=8pt,
+    fontupper=\small,
+  },
+  critica/.style={colframe=critico, colbacktitle=critico,
+    after title={\hfill CAMINHO CRÍTICO}},
+}
+\newcommand{\meta}[3]{%
+  {\sffamily\footnotesize\color{cinza}%
+   \textbf{Frente:} #1\quad\textbar\quad\textbf{Duração:} #2\quad\textbar\quad
+   \textbf{Depende de:} #3}\par\smallskip}
+% uso: \begin{tarefa}[critica]{ID}{Título}{Frente}{Duração}{Depende de}
+\newtcolorbox{tarefa}[6][]{basetarefa, title={#2\quad #3}, #1,
+  before upper={\meta{#4}{#5}{#6}}}
+
+\newtcolorbox{comandos}{enhanced, colback=black!4, colframe=black!22,
+  boxrule=0.4pt, arc=1pt, left=4pt, right=4pt, top=1pt, bottom=1pt,
+  before skip=4pt, after skip=4pt, fontupper=\footnotesize,
+  before upper={\setlength{\topsep}{0pt}\setlength{\partopsep}{0pt}}}
+
+\newtcolorbox{atencao}[1][Atenção]{enhanced, breakable,
+  colback=critico!5, colframe=critico, colbacktitle=critico, coltitle=white,
+  fonttitle=\sffamily\bfseries\small, title={#1},
+  boxrule=0.5pt, arc=1.5pt, left=5pt, right=5pt, top=3pt, bottom=3pt,
+  before skip=6pt, after skip=6pt, fontupper=\small}
+
+\newtcolorbox{dica}[1][Para ganhar tempo]{enhanced, breakable,
+  colback=verde!5, colframe=verde, colbacktitle=verde, coltitle=white,
+  fonttitle=\sffamily\bfseries\small, title={#1},
+  boxrule=0.5pt, arc=1.5pt, left=5pt, right=5pt, top=3pt, bottom=3pt,
+  before skip=6pt, after skip=6pt, fontupper=\small}
+
+% ---- Gantt ------------------------------------------------------------------------
+\ganttset{
+  critbar/.style={bar/.append style={fill=critico!55, draw=critico!85!black}},
+  esperabar/.style={bar/.append style={preaction={fill=white},
+      pattern=north east lines, pattern color=black!40, draw=black!55, dashed}},
+  esperacrit/.style={bar/.append style={preaction={fill=critico!6},
+      pattern=north east lines, pattern color=critico!60, draw=critico, dashed}},
+}
+
+\hypersetup{pdftitle={Plano de execução acelerado - pêndulo com roda de reação},
+  pdfauthor={}}
+
+\begin{document}
+
+% =====================================================================
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+  \centering
+  \vspace*{1.6cm}
+  {\sffamily\bfseries\color{azul!80!black}\Huge Plano de execução acelerado\par}
+  \vspace{6mm}
+  {\Large Pêndulo invertido com roda de reação\par}
+  \vspace{2mm}
+  {\large WeAct Black Pill STM32F411CEU6 \,\textbullet\, motor 775 \,\textbullet\,
+    controle LQR a \qty{1}{\kilo\hertz}\par}
+  \vspace{1.6cm}
+  \begin{tcolorbox}[enhanced, width=0.84\textwidth, colback=azul!5,
+      colframe=azul!60!black, boxrule=0.6pt, arc=2pt]
+    \centering\small
+    Passo a passo do ponto em que o projeto está hoje (software pronto, parte das peças
+    comprada) até o hardware \textbf{funcionando e com a configuração gravada no
+    firmware}. Cinco frentes de trabalho andam em paralelo, e o serviço de impressão 3D,
+    que define o prazo, começa a trabalhar já na primeira manhã.
+  \end{tcolorbox}
+  \vfill
+  {\large \textbf{D0} (dia do arranque):\enspace
+    \linha[1.2cm]\,/\,\linha[1.2cm]\,/\,2026\par}
+  \vspace{1.4cm}
+  {\large Trabalho de SEC\par}
+  \vspace{2mm}
+  Novembro de 2026
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Resumo executivo}
+\label{sec:resumo}
+
+\paragraph{Objetivo.} Ter o pêndulo montado, equilibrando sozinho e com a configuração
+\emph{congelada} no firmware (eixos e sinais dos sensores, ganhos recalculados com os
+parâmetros medidos, proteções testadas), no menor tempo possível.
+
+\paragraph{De onde partimos.} O software está pronto e testado: modelo e projeto do LQR
+(34~testes), firmware da Black Pill (compila; 23~testes da lógica de controle rodam no PC),
+CAD paramétrico com os STLs e ferramentas de telemetria e de identificação. Falta a parte
+física: comprar o restante, imprimir as peças, montar, ligar e passar pelas etapas de
+bancada de \arq{docs/testes_bancada.md}.
+
+\paragraph{Como chegar rápido.} Cinco frentes (A a E) trabalham ao mesmo tempo. O caminho
+crítico passa pelo serviço externo de impressão 3D, por isso a primeira manhã serve para
+medir as peças já compradas, ajustar o CAD e mandar os STLs ao serviço. Toda a eletrônica
+é montada e testada \emph{enquanto} as peças são impressas, com o motor preso numa morsa no
+lugar do braço. Quando as peças chegam, sobram só a montagem mecânica e os testes com o
+pêndulo montado: cerca de um dia e meio.
+
+\paragraph{Prazo.} No cenário de referência (compras em D2, peças em D3), o hardware fica
+pronto no fim da tarde de D4, com cerca de 40~horas-pessoa de trabalho. Para outros
+cenários, use a regra abaixo (tabela~\ref{tab:cenarios}):
+
+\begin{center}
+\fcolorbox{azul!60!black}{azul!5}{\parbox{0.9\textwidth}{\centering\small
+  \textbf{Término} $\approx \max(P;\ C+1) + 1{,}5$\quad dias, \\[2pt]
+  onde $P$ é o dia em que as peças impressas chegam e $C$ o dia em que as compras chegam
+  (D0 = 0). Um resultado como 4,5 significa a tarde de D4.}}
+\end{center}
+
+\begin{dica}[Os três pontos que mais encurtam o prazo]
+\begin{enumerate}[leftmargin=1.5em]
+  \item Mandar os STLs ao serviço de impressão ainda na manhã de D0, escolhendo o serviço
+    pelo \textbf{prazo de entrega}, não pelo preço (T2, T3.1 e T3.2).
+  \item Ter a eletrônica inteira validada (etapa~1 e etapa~4 adaptada) \textbf{antes} de as
+    peças chegarem (fase~5, marco M3).
+  \item Fazer as identificações das etapas~5 e~6 em vez de ajustar os ganhos no escuro: elas
+    levam menos de 1~h e poupam horas de tentativa e erro na etapa~7.
+\end{enumerate}
+\end{dica}
+
+\begin{table}[H]
+\centering\small
+\caption{Término previsto em três cenários de entrega.}
+\label{tab:cenarios}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Cenário & Compras chegam & Peças impressas chegam & Hardware pronto \\
+\midrule
+Otimista   & D1 & D2 & D3, à tarde \\
+Referência & D2 & D3 & D4, à tarde \\
+Pessimista & D3 & D5 & D6, à tarde \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Marcos do plano no cenário de referência.}
+\label{tab:marcos}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}Xl>{\raggedright\arraybackslash}X@{}}
+\toprule
+Marco & Significado & Previsto & Como se comprova \\
+\midrule
+M0 & Frentes definidas e inventário feito & D0 manhã & quadro de status criado \\
+M1 & STLs no serviço de impressão & D0 manhã & serviço confirmou prazo e preço \\
+M2 & Compras em mãos & D2 manhã & conferência T5.1 \\
+M3 & Eletrônica validada & D2 noite & T5.3 e T5.13 aprovadas \\
+M4 & Peças impressas em mãos & D3 manhã & inspeção T3.4 aprovada \\
+M5 & Mecânica montada & D3 tarde & braço livre de batente a batente \\
+M6 & Primeiro equilíbrio & D4 manhã & 30~s equilibrando com \cmd{imax 10} \\
+M7 & Hardware pronto e configurado & D4 tarde & lista de aceite T8.2 completa \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Como usar este plano}
+\label{sec:uso}
+
+\subsection{Convenções}
+
+\begin{itemize}
+  \item \textbf{T}\emph{f}.\emph{n} é a tarefa \emph{n} da fase \emph{f} (a T5.3, por
+    exemplo, é a etapa~1 de bancada). \textbf{M0} a \textbf{M7} são os marcos da
+    tabela~\ref{tab:marcos}.
+  \item \textbf{D0, D1, \dots} são dias corridos a partir do arranque; cada dia tem manhã e
+    tarde.
+  \item \textbf{Duração} é o trabalho ativo estimado, sem contar as esperas (entregas e
+    impressão).
+  \item Caixas com a faixa \textcolor{critico}{\textbf{vermelha}} estão no caminho crítico:
+    um atraso nelas atrasa o projeto inteiro. As caixas azuis têm folga.
+  \item \textbf{Aceite} é a condição que encerra a tarefa. \textbf{Se falhar} é a primeira
+    providência quando algo dá errado.
+  \item \caixa{} marca um item para conferir no papel.
+  \item Os comandos em caixa cinza são digitados num terminal, na raiz do projeto, com o
+    ambiente Python ativo (\cmd{source .venv/bin/activate}). Os comandos do firmware
+    (\cmd{diag}, \cmd{m 20}, \dots) são digitados no terminal aberto pelo
+    \arq{tools/telemetry_log.py}.
+\end{itemize}
+
+Cada tarefa aparece numa caixa como esta:
+
+\begin{tarefa}[critica]{T9.9}{Exemplo de tarefa}{B}{30 min}{T2.3}
+O cabeçalho diz qual frente faz a tarefa, quanto tempo de trabalho ela toma e o que precisa
+estar pronto antes. A faixa vermelha indica que ela está no caminho crítico.
+\begin{passos}
+  \item Os passos vêm numerados, na ordem em que devem ser feitos.
+\end{passos}
+\textbf{Aceite:} a condição que encerra a tarefa.\quad
+\textbf{Se falhar:} a primeira providência.
+\end{tarefa}
+
+\subsection{Frentes de trabalho}
+
+Cada frente tem uma pessoa responsável, que pode pedir ajuda às outras. Preencham a última
+coluna na reunião de arranque (T0.1).
+
+\begin{table}[H]
+\centering\small
+\caption{Frentes de trabalho.}
+\label{tab:frentes}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}Xl@{}}
+\toprule
+Frente & Escopo & Responsável \\
+\midrule
+\textbf{A}: logística & compras, rastreios, serviço de impressão, inspeção das peças,
+  subconjunto da base e proteção, fotos e logs & \linha \\
+\textbf{B}: mecânica e CAD & medições, \arq{cad/params.scad}, verificador de folgas,
+  geração dos STLs, barra do pivô, conjuntos M8, insertos, braço e roda, balanceamento,
+  pivô & \linha \\
+\textbf{C}: potência & placa perfurada, fusível, botão de emergência, capacitores e TVS,
+  divisor de tensão, buck, capacitores do motor, IBT-2, bandeja & \linha \\
+\textbf{D}: sinal e firmware & Black Pill, ST-Link, adaptador USB-serial, gravação,
+  MPU6050, sensores ópticos, analisador lógico, chicote de sinal, etapas~1 a~3 & \linha \\
+\textbf{E}: modelo e controle & testes de software, \arq{sim/params.py}, regeneração dos
+  ganhos, identificação (etapas~5 e~6), equilíbrio (etapa~7), configuração final,
+  ensaios (etapa~8) & \linha \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Regras para ganhar tempo}
+
+\begin{enumerate}
+  \item Nada que pode ser feito sem uma peça fica esperando por ela.
+  \item O caminho crítico tem prioridade sobre tudo. Quem fica sem tarefa (é comum em D1)
+    ajuda a tarefa crítica em andamento.
+  \item Uma tarefa só termina quando o critério de aceite é cumprido. Um defeito achado cedo
+    custa minutos; o mesmo defeito achado na etapa~7 custa horas.
+  \item Toda medição vai para o canal do grupo com foto (paquímetro, balança, multímetro) e
+    para a tabela do apêndice~\ref{ap:parametros}.
+  \item Nos testes, mude uma coisa por vez e grave log sempre: o \arq{tools/telemetry_log.py}
+    salva tudo em \arq{logs/}.
+  \item Toda mudança em \arq{sim/params.py} é seguida da regeneração completa
+    (apêndice~\ref{ap:comandos}). Toda inversão de sinal feita pela serial (\cmd{inv})
+    é fixada em \arq{firmware/include/board.h} no mesmo dia.
+  \item Segurança não é atalho: óculos de proteção sempre que a roda estiver montada e mão no
+    botão de emergência nos primeiros testes com motor.
+\end{enumerate}
+
+\subsection{Quadro de status e sincronizações}
+
+\begin{itemize}
+  \item \textbf{Quadro de status}: uma planilha compartilhada com as colunas
+    \emph{ID, tarefa, frente, responsável, status} (a fazer, fazendo, feito, bloqueado),
+    \emph{bloqueio} e \emph{observação}. Copiem para ela os IDs deste plano.
+  \item \textbf{Sincronizações}: duas por dia, às 12~h e às 19~h, de 15~min. Cada frente diz
+    o que terminou, o que vem a seguir e o que a bloqueia. Um bloqueio no caminho crítico é
+    resolvido na hora, com quem estiver livre.
+  \item \textbf{Canal único} de mensagens para fotos de medições, rastreios e resultados de
+    testes.
+\end{itemize}
+
+\subsection{O computador do projeto}
+
+O projeto, com a \cmd{.venv}, o PlatformIO e as regras USB já configuradas, está num PC só,
+e a pasta não é um repositório git. Na manhã de D0 as frentes B e E dividem esse PC nesta
+ordem: E das 08:30 às 09:00 (T4.1), B das 09:15 às 10:15 (T2.2 e T2.3) e E depois das 10:15
+(regeneração da T4.2).
+
+Se for preciso trabalhar em dois PCs, copie a pasta \emph{sem} a \cmd{.venv}, recrie o
+ambiente com \cmd{python3 -m venv .venv && .venv/bin/pip install -r requirements.txt} e
+instale o PlatformIO com \cmd{pipx install platformio}. O PC original continua sendo a fonte
+da verdade: qualquer mudança feita no outro PC em \arq{sim/params.py}, \arq{cad/params.scad}
+ou \arq{firmware/include/board.h} é copiada de volta no mesmo dia.
+
+% =====================================================================
+\section{Ponto de partida}
+\label{sec:partida}
+
+\subsection{O que já está pronto}
+
+\begin{table}[H]
+\centering\small
+\caption{Partes prontas do projeto.}
+\label{tab:pronto}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{4.3cm}@{}}
+\toprule
+Parte & Situação & Como conferir \\
+\midrule
+\arq{sim/} & modelo por Euler-Lagrange e LQR; $K = [-248{,}9;\ -25{,}85;\ -0{,}245]$;
+  recupera o braço solto de até 19,8° (o limite físico do torque é 22,4°) &
+  \cmd{pytest sim/tests} (34 testes) \\
+\arq{firmware/} & compila para a Black Pill; máquina de estados, proteções, telemetria a
+  \qty{200}{\hertz} & \cmd{pio test -e native} (23 testes) e \cmd{pio run} \\
+\arq{cad/} & 6 peças paramétricas, cerca de 40 folgas conferidas, STLs prontos &
+  \cmd{python cad/folgas.py} \\
+\arq{tools/} & gravação da telemetria em CSV, gráficos, identificação do motor e do
+  pêndulo & usados nas fases~5 a~8 \\
+\arq{docs/} & compras, ligações, montagem e testes de bancada & base deste plano \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Inventário: o que já foi comprado}
+
+Segundo a planilha de materiais, os itens abaixo já foram comprados. Na tarefa T0.2, quem
+comprou cada um confirma que ele está em mãos.
+
+\begin{multicols}{2}
+\begin{checklist}
+  \item Ponte H BTS7960 (módulo IBT-2)
+  \item Motor 775 de 12~V
+  \item MPU6050 (módulo GY-521)
+  \item 2 sensores ópticos de fenda (LM393)
+  \item Mini flange para eixo de 5~mm
+  \item 2 rolamentos 608-ZZ
+  \item Barra de aço de 8~mm $\times$ 250~mm
+  \item 2 colares SCC8 (8-14-8)
+  \item Insertos térmicos M3 e parafusos M3 (conferir: são precisos 18 insertos)
+  \item Termo-retrátil (1,5, 2,5 e 3,5~mm)
+  \item Fio de silicone 14~AWG (50~cm vermelho e 50~cm preto)
+  \item Analisador lógico USB de 8 canais (24~MHz)
+  \item Fusível 10~A retardado e porta-fusível (a planilha não marca como comprado:
+    confirmar)
+\end{checklist}
+\end{multicols}
+
+\textbf{Ferramentas} (definir quem leva cada uma): paquímetro; multímetro; ferro de solda com
+ponta cônica (serve também para os insertos) e estanho; balança de cozinha de 1~g (uma de
+0,1~g ajuda na T5.14); serra para metal e lima; furadeira com broca de 3,5~mm; chaves Allen;
+morsa e 2 sargentos; alicate de corte e decapador; soprador ou isqueiro para o
+termo-retrátil; estilete; régua de aço; óculos de proteção.
+
+\textbf{Não serão usados}: a placa de bornes do Arduino Nano (tem 2 $\times$ 15 pinos e a
+Black Pill tem 2 $\times$ 20), a Nucleo-F401RE e o cabo Mini-USB. \textbf{Não é preciso
+comprar filamento}: o serviço de impressão fornece.
+
+\subsection{Achados que este plano já leva em conta}
+\label{sec:achados}
+
+A revisão do projeto para montar este plano encontrou oito pontos que custariam tempo na
+bancada. As tarefas indicadas já tratam de cada um.
+
+\begin{enumerate}
+  \item \textbf{Regeneração incompleta.} Depois de mudar \arq{sim/params.py} é preciso rodar
+    também \cmd{python -m sim.export_relatorio}; sem isso o teste
+    \cmd{test_numeros_do_relatorio_em_dia} falha. O roteiro da etapa~5 em
+    \arq{docs/testes_bancada.md} cita só o \cmd{export_gains}. A sequência completa está no
+    apêndice~\ref{ap:comandos}.
+  \item \textbf{Modo MANUAL limitado a 15~s.} O firmware encerra o ensaio em malha aberta
+    15~s depois do primeiro \cmd{m} (\cmd{T_MANUAL} em
+    \arq{firmware/lib/control/rwp_control.c}), e um novo \cmd{m} não reinicia a contagem. O
+    roteiro original da etapa~5 (quatro patamares de 4~s, mais o tempo de digitar) passa
+    disso. A T7.3 faz o ensaio em duas partes, sem mexer no firmware.
+  \item \textbf{Massa dos conjuntos M8.} O valor padrão \cmd{m_conjunto = 0.024} em
+    \arq{sim/params.py} foi estimado para parafusos M8 $\times$ 25, mas o projeto usa
+    M8 $\times$ 16. O conjunto real é pesado na T5.14. A geometria do CAD não depende das
+    massas: pesar não obriga a reimprimir nada.
+  \item \textbf{Gabarito do policarbonato maior que A4.} O
+    \arq{cad/gabarito_policarbonato.svg} tem 230 $\times$ 245~mm. A T5.15 marca os dois
+    furos com régua.
+  \item \textbf{Ferramentas que faltam no PC.} PulseView (analisador lógico) e
+    \cmd{dfu-util} (plano B de gravação) não estão instalados (T4.1). As regras USB do
+    ST-Link e os grupos \cmd{dialout} e \cmd{plugdev} já estão configurados.
+  \item \textbf{Cristal da Black Pill.} O firmware supõe cristal de 25~MHz (\cmd{PLLM = 25}
+    em \arq{firmware/src/board.c}). Um clone com cristal de 8~MHz parte o cristal
+    normalmente, mas roda com o relógio errado e a serial vira lixo. Compre só a F411CEU6
+    com cristal de 25~MHz (T1.1); o plano B está na seção~\ref{sec:riscos}.
+  \item \textbf{Fio de 14~AWG.} Os 50~cm de cada cor provavelmente não bastam para
+    fonte \flecha{} fusível \flecha{} botão \flecha{} IBT-2 e para IBT-2 \flecha{} motor. A T4.6 mede o
+    percurso e a T1.1 já inclui 1~m a mais de cada cor.
+  \item \textbf{Botão de emergência com o motor parado.} Os dois capacitores de
+    \qty{4700}{\micro\farad} descarregam só pelo divisor de tensão ($\tau \approx 2$~min).
+    Se o botão for apertado com o motor parado, o \cmd{vbus} cai devagar e a falha~4 demora;
+    com o motor girando ela aparece na hora (T5.13). Não é defeito.
+\end{enumerate}
+
+% =====================================================================
+\section{Caminho crítico e paralelismo}
+\label{sec:critico}
+
+O \textbf{caminho crítico} (em vermelho na figura~\ref{fig:grafo}) é a sequência de tarefas
+que define o prazo: medição e CAD (T2) \flecha{} serviço de impressão (T3) \flecha{} inspeção e
+insertos (T3.4 e T6.1) \flecha{} montagem (T6) \flecha{} etapas~2 e~3 (T7.1 e T7.2) \flecha{} etapa~5
+(T7.3) \flecha{} etapa~6 (T7.4) \flecha{} etapa~7 (T7.5) \flecha{} configuração final (T8). Ganhar tempo
+em qualquer outra tarefa não antecipa o término; ganhar tempo nessas, sim.
+
+Há dois ramos paralelos:
+\begin{itemize}
+  \item \textbf{Eletrônica} (azul): compras \flecha{} entrega \flecha{} placa de potência e testes de
+    bancada \flecha{} integração e etapa~4 adaptada (M3). Ela precisa terminar antes de as peças
+    chegarem; no cenário de referência, tem cerca de 1~dia de folga. Se as compras atrasarem
+    mais que as peças, a eletrônica passa a ser o caminho crítico: nesse caso a montagem
+    mecânica (T6) segue normalmente e os testes começam assim que M3 for atingido.
+  \item \textbf{Preparação} (verde): conferência do software, resistência e massa do motor
+    (precisam estar em \arq{sim/params.py} antes da etapa~5), barra do pivô (antes da T6.6),
+    conjuntos M8 e policarbonato (antes da T6). Tem dias de folga, mas não pode ser
+    esquecida.
+\end{itemize}
+
+\begin{figure}[p]
+\centering
+\begin{tikzpicture}[
+  x=1cm, y=1.2cm,
+  no/.style={draw, rounded corners=2pt, align=center, font=\scriptsize\sffamily,
+    text width=32mm, minimum height=9mm, inner sep=2pt, fill=white},
+  crit/.style={no, draw=critico, line width=1pt, fill=critico!7},
+  ele/.style={no, draw=azul, fill=azul!6},
+  prep/.style={no, draw=verde, fill=verde!6},
+  espera/.style={no, dashed, draw=black!55, fill=black!3},
+  esperacrit/.style={no, dashed, draw=critico, line width=1pt, fill=critico!4},
+  seta/.style={-{Latex[length=2mm]}, thick, black!55},
+  setacrit/.style={-{Latex[length=2.4mm]}, line width=1.2pt, critico},
+]
+  % caminho crítico (coluna central)
+  \node[crit]       (t0)  at (0,   0.0) {T0 Arranque e inventário\\ 30 min $\cdot$ D0 manhã};
+  \node[crit]       (t2)  at (0,  -1.3) {T2 Medição, CAD e STLs\\ 2 h $\cdot$ D0 manhã};
+  \node[esperacrit] (t3)  at (0,  -2.6) {T3 Serviço de impressão\\ espera de 2 a 5 dias};
+  \node[crit]       (t34) at (0,  -3.9) {T3.4 e T6.1 Inspeção\\ e insertos $\cdot$ 1 h $\cdot$ D3};
+  \node[crit]       (t6)  at (0,  -5.2) {T6.2 a T6.6 Montagem\\ 3 h $\cdot$ D3};
+  \node[crit]       (t71) at (0,  -6.5) {T7.1 e T7.2 Etapas 2 e 3\\ 1 h $\cdot$ D3 tarde};
+  \node[crit]       (t73) at (0,  -7.8) {T7.3 Etapa 5: motor\\ 45 min $\cdot$ D3 tarde};
+  \node[crit]       (t74) at (0,  -9.1) {T7.4 Etapa 6: pêndulo\\ 30 min $\cdot$ D4 manhã};
+  \node[crit]       (t75) at (0, -10.4) {T7.5 Etapa 7: equilíbrio\\ 1 a 3 h $\cdot$ D4 manhã};
+  \node[crit]       (t8)  at (0, -11.7) {T8 Configuração final\\ e etapa 8 $\cdot$ D4 tarde};
+  % eletrônica
+  \node[ele]    (t1)  at (-3.9, -1.3) {T1 Compras online\\ 1,5 h $\cdot$ D0 manhã};
+  \node[espera] (ent) at (-3.9, -2.6) {Entrega das compras\\ espera de 1 a 3 dias};
+  \node[ele]    (t5c) at (-7.5, -3.9) {T5.8 a T5.11 Placa de\\ potência e motor $\cdot$ 4 h};
+  \node[ele]    (t5d) at (-3.9, -3.9) {T5.2 a T5.7 Etapa 1,\\ bancada e chicote $\cdot$ 2,5 h};
+  \node[ele]    (t5i) at (-5.7, -5.2) {T5.12 e T5.13 Integração\\ e etapa 4 $\cdot$ 1,5 h};
+  % preparação
+  \node[prep] (t4e) at (3.9, -1.3) {T4.1 e T4.2 Software,\\ R e massa do motor $\cdot$ 1 h};
+  \node[prep] (t4b) at (3.9, -2.6) {T4.3, T5.14 e T5.15: barra,\\ parafusos M8, policarbonato};
+
+  \draw[setacrit] (t0) -- (t2);
+  \draw[setacrit] (t2) -- (t3);
+  \draw[setacrit] (t3) -- (t34);
+  \draw[setacrit] (t34) -- (t6);
+  \draw[setacrit] (t6) -- (t71);
+  \draw[setacrit] (t71) -- (t73);
+  \draw[setacrit] (t73) -- (t74);
+  \draw[setacrit] (t74) -- (t75);
+  \draw[setacrit] (t75) -- (t8);
+
+  \draw[seta] (t0) -| (t1);
+  \draw[seta] (t0) -| (t4e);
+  \draw[seta] (t1) -- (ent);
+  \draw[seta] (ent) -| (t5c);
+  \draw[seta] (ent) -- (t5d);
+  \draw[seta] (t5c) |- (t5i);
+  \draw[seta] (t5d) |- (t5i);
+  \draw[seta, azul, dashed] (t5i) |- node[pos=0.78, below, font=\scriptsize\itshape,
+    text=azul]{folga $\approx$ 1 dia} (t73);
+  \draw[seta] (t4e) -- (t4b);
+  \draw[seta, verde] (t4b) |- (t6);
+  \draw[seta, verde] (t4e.east) -- ++(0.35,0) |- node[pos=0.75, above,
+    font=\scriptsize\itshape, text=verde]{R e massas em params.py} (t73.east);
+
+  % legenda
+  \begin{scope}[shift={(-7.5,-8.6)}, font=\scriptsize\sffamily]
+    \node[crit, text width=20mm, minimum height=5mm] at (0, 0) {crítico};
+    \node[ele, text width=20mm, minimum height=5mm] at (0, -0.8) {eletrônica};
+    \node[prep, text width=20mm, minimum height=5mm] at (0, -1.6) {preparação};
+    \node[espera, text width=20mm, minimum height=5mm] at (0, -2.4) {espera externa};
+  \end{scope}
+\end{tikzpicture}
+\caption{Dependências entre as tarefas. O ramo da eletrônica precisa chegar à etapa~5
+(T7.3) já validado; o ramo de preparação alimenta a montagem e a etapa~5.}
+\label{fig:grafo}
+\end{figure}
+
+% =====================================================================
+\section{Cronograma}
+\label{sec:cronograma}
+
+As duas páginas a seguir mostram o plano no tempo, para o cenário de referência (compras em
+D2, peças em D3):
+
+\begin{itemize}
+  \item o \textbf{diagrama de Gantt} (figura~\ref{fig:gantt}), com meio dia por coluna.
+    Barras vermelhas estão no caminho crítico; barras hachuradas são esperas externas
+    (entregas e impressão); losangos são os marcos;
+  \item a \textbf{matriz de paralelismo} (tabela~\ref{tab:matriz}), que diz o que
+    \emph{cada} frente faz em \emph{cada} meio período. É a resposta à pergunta ``o que
+    pode ser feito ao mesmo tempo?''.
+\end{itemize}
+
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\begin{ganttchart}[
+    hgrid={*1{black!12, dotted}},
+    vgrid={*1{draw=black!15, dashed}, *1{draw=black!55}},
+    x unit=1.38cm,
+    y unit title=0.5cm,
+    y unit chart=0.415cm,
+    title label font=\scriptsize\bfseries,
+    bar label font=\scriptsize,
+    group label font=\scriptsize\bfseries,
+    bar height=0.62, bar top shift=0.19,
+    group height=0.24, group top shift=0.38,
+    group peaks height=0.12, group peaks width=0.12,
+    group/.append style={fill=black!75},
+    milestone height=0.62, milestone top shift=0.19,
+    milestone left shift=0.82, milestone right shift=0.18,
+    milestone/.append style={fill=critico},
+    milestone inline label anchor=east,
+    milestone inline label node/.append style={anchor=west, font=\scriptsize\bfseries},
+    bar/.append style={fill=azul!35, draw=azul!80!black},
+  ]{1}{12}
+  \gantttitle{D0}{2} \gantttitle{D1}{2} \gantttitle{D2}{2} \gantttitle{D3}{2}
+  \gantttitle{D4}{2} \gantttitle{D5 (reserva)}{2} \\
+  \gantttitle{manhã}{1} \gantttitle{tarde}{1} \gantttitle{manhã}{1} \gantttitle{tarde}{1}
+  \gantttitle{manhã}{1} \gantttitle{tarde}{1} \gantttitle{manhã}{1} \gantttitle{tarde}{1}
+  \gantttitle{manhã}{1} \gantttitle{tarde}{1} \gantttitle{manhã}{1} \gantttitle{tarde}{1} \\
+  \ganttbar[critbar]{T0 Arranque e inventário (todos)}{1}{1} \\
+  \ganttgroup{A: logística}{1}{10} \\
+  \ganttbar{T3.1, T1 Cotação e pedidos online}{1}{1} \\
+  \ganttbar[critbar]{T3.2 Contratar o serviço e enviar os STLs}{1}{1} \\
+  \ganttbar[esperabar]{Compras em trânsito (1 a 3 dias)}{2}{4} \\
+  \ganttbar[esperacrit]{Serviço imprimindo (2 a 5 dias)}{2}{6} \\
+  \ganttbar{T5.1 Conferir a entrega das compras}{5}{5} \\
+  \ganttbar[critbar]{T3.4 Inspeção das peças e T6.1 insertos}{7}{7} \\
+  \ganttbar{T6.3 Base, bandeja e proteção}{7}{8} \\
+  \ganttbar{T8.4 Logs, fotos e valores finais}{10}{10} \\
+  \ganttgroup{B: mecânica e CAD}{1}{8} \\
+  \ganttbar[critbar]{T2 Medição, CAD e STLs}{1}{1} \\
+  \ganttbar{T4.3, T4.4 Barra de 82 mm e fixações}{2}{2} \\
+  \ganttbar{T5.14, T5.15 Conjuntos M8 e policarbonato}{5}{5} \\
+  \ganttbar[critbar]{T6.1, T6.2 Insertos, braço e roda}{7}{7} \\
+  \ganttbar[critbar]{T6.6 Pivô e montagem final}{8}{8} \\
+  \ganttgroup{C: potência}{2}{7} \\
+  \ganttbar{T4.5, T4.6 Layout da placa, chicote do motor}{2}{2} \\
+  \ganttbar{T5.8 a T5.11 Placa, proteções, buck, motor}{5}{6} \\
+  \ganttbar{T6.5 Eletrônica na bandeja}{7}{7} \\
+  \ganttgroup{D: sinal e firmware}{2}{9} \\
+  \ganttbar{T4.7 PulseView e roteiro de sinais}{2}{2} \\
+  \ganttbar{T5.2 a T5.7 Etapa 1, bancada, chicote}{5}{6} \\
+  \ganttbar{T6.4 Sensores e MPU6050 no braço}{7}{7} \\
+  \ganttbar[critbar]{T7.1, T7.2 Etapas 2 e 3}{8}{8} \\
+  \ganttgroup{E: modelo e controle}{1}{10} \\
+  \ganttbar{T4.1, T4.2 Software, R e massa do motor}{1}{1} \\
+  \ganttbar{T5.12, T5.13 Integração e etapa 4}{6}{6} \\
+  \ganttbar{T6.7 Pesagens e regeneração}{7}{7} \\
+  \ganttbar[critbar]{T7.3 Etapa 5 (motor)}{8}{8} \\
+  \ganttbar[critbar]{T7.4, T7.5 Etapas 6 e 7}{9}{9} \\
+  \ganttbar[critbar]{T8.1 a T8.3 Configuração final e etapa 8}{10}{10} \\
+  \ganttgroup[group/.append style={draw=none, fill=none}]{Marcos}{1}{10} \\
+  \ganttmilestone[inline]{M1}{1}
+  \ganttmilestone[inline]{M2}{4}
+  \ganttmilestone[inline]{M3}{6}
+  \ganttmilestone[inline]{M4}{7}
+  \ganttmilestone[inline]{M5}{8}
+  \ganttmilestone[inline]{M6}{9}
+  \ganttmilestone[inline]{M7}{10}
+\end{ganttchart}
+\caption{Cronograma no cenário de referência. Vermelho: caminho crítico. Hachurado: espera
+externa. M1 a M7: marcos da tabela~\ref{tab:marcos}. Dentro de um mesmo meio período, a ordem
+das tarefas é a das fases (seções~\ref{sec:fase0} a~\ref{sec:fase8}). Se uma entrega atrasar,
+as barras que dependem dela andam junto; D5 é a reserva.}
+\label{fig:gantt}
+\end{figure}
+
+\begin{table}[p]
+\centering\scriptsize
+\caption{Matriz de paralelismo: o que cada frente faz em cada meio período (cenário de
+referência). Em negrito, as tarefas do caminho crítico.}
+\label{tab:matriz}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.1cm}*{5}{>{\raggedright\arraybackslash}X}@{}}
+\toprule
+Período & A: logística & B: mecânica e CAD & C: potência & D: sinal e firmware & E: modelo e controle \\
+\midrule
+D0 manhã & \textbf{T0} reunião; T3.1 pedir cotações; T1.1 e T1.2 pedidos online;
+  \textbf{T3.2} contratar e enviar os STLs (\flecha{} M1)
+  & \textbf{T0}; \textbf{T2.1 a T2.3} medição, CAD e STLs
+  & \textbf{T0}; ajuda na T2.1 (sensores, insertos)
+  & \textbf{T0}; ajuda na T2.1 (flange, MPU6050)
+  & \textbf{T0}; T4.1 software e ferramentas; T4.2 R e massa do motor \\
+\midrule
+D0 tarde & T3.3 acompanhar o serviço; T4.8 rastreios
+  & T4.3 barra de 82~mm; T4.4 fixações para os ensaios
+  & T4.5 layout da placa; T4.6 chicote do motor e IBT-2
+  & T4.7 PulseView e roteiro de sinais
+  & revisão das fases~5 e~7; apoio \\
+\midrule
+D1 (folga) & T3.3; T4.8: compra local se algum prazo passar de D3
+  & apoio onde houver atraso & apoio onde houver atraso & apoio onde houver atraso
+  & apoio onde houver atraso \\
+\midrule
+D2 (compras) & T5.1 conferir a entrega (\flecha{} M2)
+  & T5.14 conjuntos M8; T5.15 furar o policarbonato
+  & T5.8 placa; T5.9 potência; T5.10 buck e energização; T5.11 capacitores do motor
+  & T5.2 Black Pill; T5.3 etapa~1; T5.4 MPU6050; T5.5 sensores; T5.7 chicote de sinal
+  & T5.12 integração e T5.13 etapa~4 adaptada, com C e D (\flecha{} M3) \\
+\midrule
+D3 manhã (peças) & \textbf{T3.4} inspeção (\flecha{} M4); \textbf{T6.1} insertos da base;
+  T6.3 base e bandeja
+  & \textbf{T6.1} insertos da roda e do braço; \textbf{T6.2} braço e roda
+  & T6.5 eletrônica na bandeja
+  & T6.4 sensores e MPU6050 no braço
+  & T6.7 pesagens e regeneração \\
+\midrule
+D3 tarde & T6.3 proteção; apoio na T6.6
+  & \textbf{T6.6} pivô (\flecha{} M5)
+  & apoio na fiação; botão de emergência à mão
+  & \textbf{T7.1} etapa~2; \textbf{T7.2} etapa~3
+  & \textbf{T7.3} etapa~5 \\
+\midrule
+D4 manhã & segurança (botão de emergência) e anotações
+  & apoio na T7.4 (base de cabeça para baixo)
+  & apoio
+  & \textbf{T7.4} e \textbf{T7.5}, com E
+  & \textbf{T7.4} etapa~6; \textbf{T7.5} etapa~7 (\flecha{} M6) \\
+\midrule
+D4 tarde & T8.4 logs, fotos e valores finais
+  & \textbf{T8.2} lista de aceite
+  & \textbf{T8.2} lista de aceite
+  & \textbf{T8.2}; T8.3 ensaios
+  & \textbf{T8.1} congelar a configuração; \textbf{T8.2}; T8.3 (\flecha{} M7) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{landscape}
+
+% =====================================================================
+\section{Fase 0: arranque (D0, primeiros 30 min)}
+\label{sec:fase0}
+
+\begin{tarefa}[critica]{T0.1}{Reunião de arranque}{todas}{20 min}{---}
+\begin{passos}
+  \item Leiam juntos o resumo (seção~\ref{sec:resumo}) e a matriz de paralelismo
+    (tabela~\ref{tab:matriz}).
+  \item Preencham a coluna ``Responsável'' das frentes A a E (tabela~\ref{tab:frentes}).
+  \item Criem o quadro de status (seção~\ref{sec:uso}) e copiem para ele os IDs das tarefas.
+  \item Combinem as sincronizações das 12~h e das 19~h e o canal único de mensagens.
+  \item Escrevam a data do D0 na capa.
+\end{passos}
+\textbf{Aceite:} cada pessoa sabe sua frente e sua primeira tarefa; quadro criado
+(\flecha{} M0).
+\end{tarefa}
+
+\begin{tarefa}[critica]{T0.2}{Inventário físico}{todas}{10 min}{T0.1}
+\begin{passos}
+  \item Cada pessoa confirma os itens do inventário (seção~\ref{sec:partida}) que estão com
+    ela.
+  \item Confirmem o fusível de 10~A com porta-fusível e a quantidade de insertos M3
+    (18: 16 usados e 2 de reserva).
+  \item Definam quem leva cada ferramenta.
+  \item Quem está com o motor, o flange, os sensores ópticos, os insertos e o MPU6050 separa
+    essas peças para a medição (T2.1). Se o grupo não estiver junto, cada um mede a sua em
+    casa.
+\end{passos}
+\textbf{Aceite:} lista do que falta fechada e entregue à frente~A.\quad
+\textbf{Se falhar:} item marcado como comprado e não encontrado entra na lista da T1.1 na
+hora.
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 1: compras online (D0 manhã)}
+\label{sec:fase1}
+
+\begin{tarefa}{T1.1}{Fechar a lista de compras}{A}{30 min}{T0.2}
+\begin{passos}
+  \item Partam da tabela~\ref{tab:compras} e risquem o que já está em mãos.
+  \item A coluna ``Bloqueia'' diz o que fica parado sem o item; ela define a prioridade.
+  \item Comprem as reservas indicadas: uma placa queimada ou um fusível a menos custa dias.
+\end{passos}
+\textbf{Aceite:} lista final com quantidades.
+\end{tarefa}
+
+\needspace{8\baselineskip}
+\noindent\begin{minipage}{\linewidth}\captionof{table}{Lista de compras consolidada.}\label{tab:compras}\end{minipage}
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.4cm}c>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{1.9cm}@{}}
+\toprule
+Item & Qtd. & Especificação e cuidados & Bloqueia \\
+\midrule
+\endfirsthead
+\toprule
+Item & Qtd. & Especificação e cuidados & Bloqueia \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\footnotesize continua na próxima página}\\
+\endfoot
+\bottomrule
+\endlastfoot
+\multicolumn{4}{@{}l}{\small\textbf{Placa e gravação}} \\
+WeAct Black Pill STM32F411CEU6 & 2 & 1 de reserva, de vendedores diferentes. Confira no
+  anúncio: chip \textbf{F411CEU6} (não F401) e cristal de \textbf{25~MHz} & T5.3 \\
+ST-Link V2 (clone USB) & 1 & gravação e depuração pelo SWD & T5.3 \\
+Adaptador USB-serial de 3,3~V (CP2102 ou CH340) & 1 & com jumper de 3,3~V; telemetria a
+  460800~baud & T5.3 \\
+Barra de pinos fêmea 1 $\times$ 20 & 2 & soquete da Black Pill na placa perfurada & T5.8 \\
+Jumpers fêmea-fêmea & 20 & ST-Link e testes de bancada & T5.3 \\
+Cabo USB-C de dados & 1 & só para gravação por DFU (plano B) & --- \\
+\midrule
+\multicolumn{4}{@{}l}{\small\textbf{Potência e proteção}} \\
+Fonte chaveada 12~V, 10~A ou mais & 1 & não use fonte ATX: pode desarmar na frenagem & T5.10 \\
+Fusível 10~A retardado e porta-fusível & 1 + 2 & se ainda não comprado; 2 fusíveis de
+  reserva & T5.9 \\
+Botão de emergência NF, DC $\geq$ 10~A & 1 & normalmente \textbf{fechado}; corta só o
+  positivo do motor & T5.9 \\
+TVS SMBJ15A & 2 & 1 de reserva; equivalente de furo: P6KE18A & T5.9 \\
+Capacitor eletrolítico \qty{4700}{\micro\farad} / 35~V & 2 & junto aos bornes do IBT-2 &
+  T5.9 \\
+Capacitor cerâmico \qty{100}{\nano\farad} & 10 & 3 no motor, 1 no barramento, 1 no PA4,
+  reservas & T5.9 \\
+Resistores de \qty{10}{\kilo\ohm} e \qty{2,2}{\kilo\ohm} (1/4~W) & 4 + 2 & divisor do
+  barramento e pull-down do EN; um kit de resistores serve & T5.8 \\
+Conversor buck LM2596 (ou MP1584) & 1 & ajustado em 5,0~V antes de ligar na placa & T5.10 \\
+Placa perfurada & 2 & uma para a Black Pill, um pedaço para os capacitores do barramento &
+  T5.8 \\
+Bornes de parafuso de 2 vias & 6 & entrada de 12~V, barramento, conexões de potência & T5.8 \\
+Fio de silicone 22--24~AWG & 4 cores & sinais (MPU6050, sensores, IBT-2) & T5.7 \\
+Fio de silicone 14~AWG & 1~m de cada cor & complementa os 50~cm já comprados & T5.9 \\
+Fita isolante & 1 & & --- \\
+\midrule
+\multicolumn{4}{@{}l}{\small\textbf{Ferragens e materiais de montagem}} \\
+Parafuso M8 $\times$ 16, porca e arruela & 14 de cada & \textbf{M8 $\times$ 16 exatos}
+  (mais compridos batem no braço); 2 a mais para escolher 12 iguais & T5.14 \\
+Parafuso M4 $\times$ 8 & 4 & prendem o motor; mais compridos podem tocar o enrolamento &
+  T6.2 \\
+Kit M3 (8, 10, 12 e 16~mm) com porcas & 1 & M3$\times$8: flange e bandeja; M3$\times$10:
+  suporte e sensores; M3$\times$12: MPU6050 e travas da barra; M3$\times$16: postes & T6 \\
+Espaçadores de náilon de 3~mm & 4 & MPU6050 & T6.4 \\
+Trava-rosca médio (azul) & 1 & parafusos do flange no eixo do motor & T6.2 \\
+Cola de contato & 1 & almofadas dos batentes & T6.3 \\
+Placa de policarbonato de 2 a 3~mm & 1 & \textbf{230 $\times$ 230~mm}; peça já cortada &
+  T5.15 \\
+EVA ou borracha de 3~mm & 1 folha & plano B se o serviço não imprimir TPU & T6.3 \\
+\end{xltabular}
+
+\begin{tarefa}{T1.2}{Fazer os pedidos}{A}{1 h}{T1.1}
+\begin{passos}
+  \item Priorizem o \textbf{prazo de entrega}, não o preço: filtrem por entrega rápida,
+    vendedor da região e estoque disponível.
+  \item Concentrem em poucos vendedores (menos fretes e rastreios), mas comprem as duas
+    Black Pills em vendedores diferentes.
+  \item Paguem por Pix ou cartão; boleto atrasa de 1 a 3 dias úteis.
+  \item Registrem no quadro: item, loja, prazo prometido e código de rastreio.
+  \item Se algum prazo prometido passar de D3, comprem o item numa loja física
+    (tabela~\ref{tab:locais}).
+\end{passos}
+\textbf{Aceite:} todos os pedidos feitos com prazo até D3 e rastreios no quadro.\quad
+\textbf{Se falhar:} item sem entrega rápida \flecha{} loja física ou substituto equivalente
+(por exemplo, o buck MP1584 no lugar do LM2596).
+\end{tarefa}
+
+\begin{table}[H]
+\centering\small
+\caption{Onde comprar na hora, se uma entrega atrasar.}
+\label{tab:locais}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Item & Onde & Observação \\
+\midrule
+Parafusos M8, M4 e M3, porcas, arruelas, trava-rosca & loja de parafusos ou ferragens &
+  leve um parafuso de amostra; o M8 tem que ter 16~mm \\
+Policarbonato 230 $\times$ 230~mm & vidraçaria, loja de acrílico ou de comunicação visual &
+  peça cortado na medida \\
+Fonte 12~V 10~A & loja de CFTV, iluminação LED ou informática & fonte chaveada tipo
+  ``colmeia'' \\
+Botão de emergência NF & loja de material elétrico ou automação & confira a corrente em
+  DC \\
+Capacitores, TVS, resistores, placa perfurada, bornes, buck & loja de componentes
+  eletrônicos & TVS equivalente: P6KE18A \\
+Black Pill, ST-Link, adaptador USB-serial & loja de eletrônica ou maker & só F411CEU6 com
+  cristal de 25~MHz \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Fase 2: medição das peças e CAD (D0 manhã)}
+\label{sec:fase2}
+
+Esta é a primeira tarefa do caminho crítico: os STLs só vão para o serviço depois que as
+medidas das peças compradas estiverem no CAD. As linhas marcadas \cmd{CONFERIR} em
+\arq{cad/params.scad} têm valores típicos, e as peças reais variam (o motor 775, por
+exemplo, existe com carcaça de 42 e de 44,5~mm).
+
+\begin{tarefa}[critica]{T2.1}{Medir as peças compradas}{B, com quem tem as peças}{45 min}{T0.2}
+\textbf{Material:} paquímetro, motor, flange, sensores ópticos, um inserto M3, MPU6050.
+\begin{passos}
+  \item Distribuam a medição: cada peça é medida por quem está com ela, e os valores vão para
+    o canal do grupo com a foto do paquímetro.
+  \item Meçam cada item da tabela~\ref{tab:medidas} duas vezes, com resolução de 0,1~mm.
+  \item Capriche nas medidas que mexem nas folgas mais justas do CAD: altura das torres e
+    largura da fenda do sensor (hoje sobra só 0,5~mm acima do mínimo, tanto entre as torres e
+    o aro da roda quanto entre o anel dentado e as paredes da fenda), diâmetro da carcaça do
+    motor (parede do braço em volta dele) e diâmetro do inserto.
+  \item Os parafusos e porcas M8 só chegam em D2: mantenham os valores típicos, que são de
+    norma (porca de 13~mm entre faces e 6,5~mm de altura). O parafuso atravessa a porca com
+    2,4~mm de sobra, então até uma porca de 6,8~mm (ISO 4032) serve.
+\end{passos}
+\textbf{Aceite:} todas as linhas da tabela~\ref{tab:medidas} com o valor medido.
+\end{tarefa}
+
+{\small
+\needspace{8\baselineskip}
+\noindent\begin{minipage}{\linewidth}\captionof{table}{Medidas a conferir em \protect\arq{cad/params.scad} (valores em mm).}\label{tab:medidas}\end{minipage}
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.6cm}rp{1.6cm}@{}}
+\toprule
+Peça & O que medir & Variável & Típico & Medido \\
+\midrule
+\endfirsthead
+\toprule
+Peça & O que medir & Variável & Típico & Medido \\
+\midrule
+\endhead
+\midrule
+\multicolumn{5}{r}{\footnotesize continua na próxima página}\\
+\endfoot
+\bottomrule
+\endlastfoot
+Motor 775 & diâmetro da carcaça & \cmd{motor_d} & 44,5 & \linha[1.4cm] \\
+ & comprimento da carcaça & \cmd{motor_comp} & 67 & \linha[1.4cm] \\
+ & diâmetro do ressalto do mancal (na face) & \cmd{motor_ressalto_d} & 17,5 & \linha[1.4cm] \\
+ & altura do ressalto & \cmd{motor_ressalto_h} & 4,6 & \linha[1.4cm] \\
+ & distância entre os 2 furos M4 da face & \cmd{motor_furos_dist} & 29 & \linha[1.4cm] \\
+ & comprimento do eixo para fora do ressalto & \cmd{motor_eixo_comp} & 17 & \linha[1.4cm] \\
+\midrule
+Flange de 5~mm & diâmetro do disco & \cmd{flange_d} & 22 & \linha[1.4cm] \\
+ & espessura do disco & \cmd{flange_esp} & 3 & \linha[1.4cm] \\
+ & diâmetro do cubo (parte com os parafusos de trava) & \cmd{flange_cubo_d} & 10 & \linha[1.4cm] \\
+ & comprimento do cubo & \cmd{flange_cubo_comp} & 9 & \linha[1.4cm] \\
+ & diâmetro do círculo dos furos & \cmd{flange_pcd} & 16 & \linha[1.4cm] \\
+ & número de furos & \cmd{flange_n} & 4 & \linha[1.4cm] \\
+\midrule
+Sensor óptico (LM393) & comprimento da placa & \cmd{sens_comp} & 32 & \linha[1.4cm] \\
+ & largura da placa & \cmd{sens_larg} & 14 & \linha[1.4cm] \\
+ & espessura da placa & \cmd{sens_pcb} & 1,6 & \linha[1.4cm] \\
+ & altura das torres acima da placa & \cmd{sens_torre_h} & 10,8 & \linha[1.4cm] \\
+ & do topo da torre até o centro da janela do feixe & \cmd{sens_feixe} & 2,8 & \linha[1.4cm] \\
+ & largura da fenda (vão entre as torres) & \cmd{sens_fenda} & 5 & \linha[1.4cm] \\
+ & comprimento do bloco do sensor ao longo da placa & \cmd{sens_cabeca} & 6 & \linha[1.4cm] \\
+ & do centro da fenda até o furo de fixação & \cmd{sens_furo_pos} & 22 & \linha[1.4cm] \\
+\midrule
+Inserto M3 & diâmetro externo; na variável vai o medido menos 0,2 & \cmd{inserto_m3_d} & 4,0 & \linha[1.4cm] \\
+ & comprimento (tem que caber na profundidade) & \cmd{inserto_m3_prof} & 5 & \linha[1.4cm] \\
+\midrule
+MPU6050 & distância entre os furos de fixação & \cmd{mpu_furos_dist} & 15,2 & \linha[1.4cm] \\
+\midrule
+Padronizadas & rolamento 608 (diâmetro externo e espessura) & \cmd{rol_d}, \cmd{rol_esp} & 22 / 7 & \linha[1.4cm] \\
+ & barra de aço & \cmd{barra_d} & 8 & \linha[1.4cm] \\
+ & colar SCC8 (diâmetro externo e largura) & \cmd{colar_d}, \cmd{colar_esp} & 14 / 8 & \linha[1.4cm] \\
+\end{xltabular}
+}
+
+\begin{tarefa}[critica]{T2.2}{Atualizar o CAD e conferir as folgas}{B}{20 min}{T2.1}
+\begin{passos}
+  \item Em \arq{cad/params.scad}, troque os números das linhas \cmd{CONFERIR} pelos medidos.
+    Escreva só números, sem expressões: o verificador lê o arquivo linha a linha.
+  \item Rode o verificador de folgas:
+\begin{comandos}
+\begin{verbatim}
+source .venv/bin/activate
+python cad/folgas.py        # a última linha tem que ser: TODAS AS FOLGAS OK
+\end{verbatim}
+\end{comandos}
+  \item Se alguma verificação falhar, a linha mostra qual folga e quanto falta. Corrija antes
+    de seguir: nunca mande STLs com folga falhando.
+\end{passos}
+\textbf{Aceite:} \cmd{TODAS AS FOLGAS OK}.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T2.3}{Gerar os STLs e o pacote para o serviço}{B}{20 min}{T2.2}
+\begin{passos}
+  \item Gere as peças, as imagens e as massas (leva alguns minutos):
+\begin{comandos}
+\begin{verbatim}
+./cad/build.sh
+cd cad/stl
+rm -f ../pecas_impressao_3d.zip
+zip ../pecas_impressao_3d.zip roda.stl braco.stl suporte_sensores.stl \
+    base.stl bandeja.stl batente_tpu.stl
+cd ../..
+\end{verbatim}
+\end{comandos}
+  \item Abra as prévias em \arq{cad/previews/} (\cmd{montagem_0graus_iso.png},
+    \cmd{montagem_25graus_frente.png}, \cmd{roda.png}, \cmd{braco.png}) e confira se nenhuma
+    peça mudou de forma estranha.
+  \item Entregue o arquivo \arq{cad/pecas_impressao_3d.zip} (só os 6 STLs, sem o
+    \cmd{massas.json}) à frente~A.
+\end{passos}
+\textbf{Aceite:} zip com os 6 STLs nas mãos da frente~A.
+\end{tarefa}
+
+\begin{dica}
+Se a medição do motor, do flange ou dos sensores atrasar, \cmd{base.stl}, \cmd{bandeja.stl} e
+\cmd{batente_tpu.stl} podem ir antes: elas dependem só do inserto e das peças padronizadas
+(barra, colares, rolamentos), não das medidas do motor, do flange nem dos sensores.
+\end{dica}
+
+% =====================================================================
+\section{Fase 3: serviço de impressão (D0 a D3)}
+\label{sec:fase3}
+
+\begin{tarefa}[critica]{T3.1}{Pedir cotações a três serviços}{A}{20 min, mais a espera das respostas}{T0.1}
+\begin{passos}
+  \item Listem três serviços: primeiro os da cidade que permitem retirar em mãos (lojas de
+    impressão 3D, makerspaces, laboratórios da faculdade); depois serviços online com envio
+    expresso.
+  \item Mandem a mensagem da caixa abaixo pedindo prazo e preço. Avisem que os arquivos
+    finais seguem em até 2~h; se o serviço aceitar, mandem já o zip atual
+    (\arq{cad/pecas_impressao_3d.zip}) para ele fatiar e estimar o tempo, porque as medidas
+    mudam pouco.
+  \item Perguntem se imprimem PETG e TPU, se entregam em lotes e se podem começar hoje.
+\end{passos}
+\textbf{Aceite:} três respostas com prazo e preço (ou duas, se a terceira demorar mais de
+1~h).
+\end{tarefa}
+
+\begin{tcolorbox}[enhanced, breakable, colback=black!3, colframe=black!40,
+    title={Mensagem pronta para o serviço de impressão (copiar e colar)},
+    fonttitle=\sffamily\bfseries\small, colbacktitle=black!60, coltitle=white,
+    fontupper=\small, boxrule=0.5pt, arc=1.5pt]
+Olá! Preciso imprimir com urgência 6 arquivos STL (em anexo) para um projeto de faculdade.
+Qual o menor prazo e o preço? Se possível, entreguem o lote~1 antes. Medidas em mm,
+escala 100\,\%. Nenhuma peça precisa de suporte. Total aproximado: 350~g.
+
+\textbf{Lote 1 (prioridade)}
+\begin{itemize}
+  \item \cmd{roda.stl}, 1~un.: PETG, camada de 0,2~mm, 4 perímetros, preenchimento de pelo
+    menos 60\,\% (aro a 100\,\% se der), face da frente na mesa (como está no STL). Peça
+    crítica: gira a até 2000~rpm com parafusos M8 na borda.
+  \item \cmd{braco.stl}, 1~un.: PETG, 0,2~mm, 4 perímetros, 50\,\%, face da frente na mesa.
+  \item \cmd{suporte_sensores.stl}, 1~un.: PETG (PLA serve), 0,2~mm, 4 perímetros, 60\,\%,
+    prateleira na mesa.
+\end{itemize}
+\textbf{Lote 2}
+\begin{itemize}
+  \item \cmd{base.stl}, 1~un.: PETG (PLA serve), 0,2~mm (0,28~mm serve), 4 perímetros,
+    30\,\%, fundo na mesa.
+  \item \cmd{bandeja.stl}, 1~un.: PETG (PLA serve), 0,2~mm (0,28~mm serve), 3 perímetros,
+    25\,\%, deitada.
+\end{itemize}
+\textbf{Lote 3 (opcional)}
+\begin{itemize}
+  \item \cmd{batente_tpu.stl}, 2~un.: TPU 95A, 100\,\%, de 20 a 30~mm/s. Se não tiverem TPU,
+    podem pular.
+\end{itemize}
+\end{tcolorbox}
+
+\begin{atencao}[Material: o que pode e o que não pode mudar]
+\textbf{Roda e braço só em PETG} (ABS ou ASA também servem), nunca em PLA: o motor esquenta
+dentro do braço e o PLA amolece perto de 60~°C; a roda gira a até 2000~rpm com 12 parafusos
+M8 na borda. Suporte, base e bandeja aceitam PLA se isso encurtar o prazo. Base e bandeja
+aceitam camada de 0,28~mm (imprimem cerca de 30\,\% mais rápido).
+\end{atencao}
+
+\begin{tarefa}[critica]{T3.2}{Contratar o serviço e enviar os STLs}{A}{15 min}{T2.3 e T3.1}
+\begin{passos}
+  \item Escolham pelo \textbf{prazo de entrega}. Um dia a mais no serviço é um dia a mais no
+    projeto inteiro.
+  \item Se nenhum serviço entrega tudo rápido, dividam: lote~1 no mais rápido, lote~2 no
+    outro.
+  \item Enviem o zip e a ficha (a mensagem acima). Peçam foto da primeira camada da roda e do
+    braço, se o serviço aceitar.
+  \item Registrem no quadro: serviço, prazo prometido e contato.
+\end{passos}
+\textbf{Aceite:} o serviço confirmou o recebimento dos arquivos e o prazo (\flecha{} M1).
+\end{tarefa}
+
+\begin{tarefa}{T3.3}{Acompanhar a impressão}{A}{10 min por dia}{T3.2}
+\begin{passos}
+  \item Confirmem o andamento no fim de cada dia.
+  \item Se o prazo escorregar, acionem o plano B no mesmo dia: dividir os lotes ou mudar o
+    lote~1 de serviço.
+  \item Se o serviço for local, retirem em mãos assim que ficar pronto, sem esperar a
+    entrega.
+\end{passos}
+\textbf{Aceite:} peças retiradas ou entregues.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T3.4}{Inspeção de recebimento}{A e B}{30 min}{peças em mãos}
+\textbf{Material:} paquímetro, balança, um rolamento 608, uma porca M8, um parafuso M8, a
+barra de 8~mm, o motor e o policarbonato.
+\begin{passos}
+  \item \textbf{Roda}:
+    \begin{checklist}
+      \item aro sem rachaduras nem camadas soltas (aperte com os dedos e dê batidas leves:
+        o som deve ser ``cheio'');
+      \item os 40 dentes do anel do encoder inteiros, sem fios de plástico entre eles
+        (limpe com estilete);
+      \item os 12 furos de 8,4~mm livres e os alojamentos hexagonais aceitando a porca M8;
+      \item 4 furos de inserto atrás do cubo;
+      \item diâmetro do aro \aprox{} 116~mm e do anel dentado \aprox{} 132~mm (escala
+        certa).
+    \end{checklist}
+  \item \textbf{Braço}:
+    \begin{checklist}
+      \item o rolamento 608 entra nos assentos com pressão firme (nem solto, nem
+        impossível);
+      \item a carcaça do motor encaixa no rebaixo e os 2 furos M4 coincidem com os do motor;
+      \item os 4 furos de inserto (2 na frente, 2 atrás) abertos.
+    \end{checklist}
+  \item \textbf{Suporte dos sensores}: rasgos verticais livres e prateleira plana.
+  \item \textbf{Base}: a barra de 8~mm passa pelos dois suportes; o policarbonato entra nas
+    ranhuras dos postes; a base não está empenada.
+  \item \textbf{Bandeja}: grade de furos M3 aberta.
+  \item \textbf{Pesagem}: pese cada peça e compare com \arq{cad/stl/massas.json}
+    ($\pm$15\,\%): roda \aprox{} 73~g, braço \aprox{} 53~g, suporte \aprox{} 11~g, base
+    \aprox{} 190~g, bandeja \aprox{} 20~g. Anote a massa da roda \textbf{antes} dos insertos
+    (ela entra na T6.7).
+\end{passos}
+\textbf{Aceite:} tudo conferido (\flecha{} M4).\quad
+\textbf{Se falhar:} furo apertado \flecha{} broca ou lima; assento de rolamento justo \flecha{}
+T6.2; rachadura na roda \flecha{} reimprimir (é a peça crítica: não use).
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 4: preparação durante a espera (D0 tarde e D1)}
+\label{sec:fase4}
+
+Nada aqui depende das compras nem das peças impressas. D1 é folga: usem para adiantar o
+que estiver atrasado e para revisar a fiação no papel.
+
+\begin{tarefa}{T4.1}{Conferir o software e instalar as ferramentas}{E}{30 min}{T0.1}
+\begin{passos}
+  \item No PC do projeto:
+\begin{comandos}
+\begin{verbatim}
+source .venv/bin/activate
+pytest sim/tests                 # 34 passed
+cd firmware
+pio test -e native               # 23 testes, todos OK
+pio run                          # SUCCESS
+cd ..
+sudo apt install pulseview sigrok-firmware-fx2lafw dfu-util
+\end{verbatim}
+\end{comandos}
+  \item Este PC já tem as regras USB do ST-Link e o usuário nos grupos \cmd{dialout} e
+    \cmd{plugdev}. Num outro PC é preciso instalar o PlatformIO, as regras udev do
+    PlatformIO (\url{https://docs.platformio.org}, ``99-platformio-udev.rules'') e rodar
+    \cmd{sudo usermod -aG dialout,plugdev $USER}; a mudança de grupo vale depois de sair e
+    entrar de novo na sessão.
+\end{passos}
+\textbf{Aceite:} os três comandos passam e o PulseView abre.
+\end{tarefa}
+
+\begin{tarefa}{T4.2}{Resistência e massa do motor}{E}{30 min}{T0.2}
+\textbf{Material:} multímetro, balança, motor, flange.
+\begin{passos}
+  \item Multímetro na menor escala de resistência. Encoste as pontas uma na outra e anote a
+    resistência delas ($R_\text{pontas}$).
+  \item Meça nos terminais do motor em 4 posições do eixo (1/4 de volta entre as leituras) e
+    anote a \textbf{menor} ($R_\text{min}$). A resistência é
+    $R = R_\text{min} - R_\text{pontas}$; o típico fica entre 0,3 e \qty{1}{\ohm}.
+  \item Pese o motor (sem fios) e o flange com os parafusos de trava.
+  \item Em \arq{sim/params.py}, atualize \cmd{Motor.R}, \cmd{Motor.massa} e
+    \cmd{Roda.m_flange}.
+  \item Regenere tudo (apêndice~\ref{ap:comandos}), ainda sem gravar: a placa não chegou.
+\end{passos}
+\textbf{Aceite:} valores anotados no apêndice~\ref{ap:parametros} e regeneração sem erro.
+\begin{atencao}
+Nunca meça a corrente do motor ligando-o à fonte com o multímetro em série na escala de
+10~A: a corrente de partida do 775 passa de 10~A e queima o fusível do multímetro. A
+identificação da T7.3 dá a corrente em vazio sem esse risco.
+\end{atencao}
+\end{tarefa}
+
+\begin{tarefa}{T4.3}{Cortar a barra do pivô}{B}{30 min}{T0.2}
+\begin{passos}
+  \item Marque 82~mm na barra de 250~mm (o \cmd{folgas.py} confirma: ``cortar com 82 mm'').
+  \item Corte com a serra para metal, com a barra presa na morsa e protegida por um pano.
+  \item Tire a rebarba com a lima e faça um chanfro leve nas duas pontas.
+  \item Teste: os dois colares deslizam e travam; os rolamentos entram na barra sem folga
+    visível.
+  \item Guarde a sobra de 168~mm: ela serve de eixo provisório na etapa~6 se a base atrasar
+    (T7.4).
+\end{passos}
+\textbf{Aceite:} barra com 82 $\pm$ 0,5~mm e sem rebarba.
+\end{tarefa}
+
+\begin{tarefa}{T4.4}{Preparar as fixações para os ensaios}{B}{20 min}{---}
+\begin{passos}
+  \item Para a etapa~4 adaptada (T5.13): morsa com um pano ou borracha para prender o motor
+    pela carcaça sem amassar, com o eixo na horizontal.
+  \item Para a etapa~5 (T7.3): um sargento que prenda o braço na vertical contra a base.
+  \item Para a etapa~6 (T7.4): dois sargentos para prender a base de cabeça para baixo na
+    borda da mesa.
+\end{passos}
+\textbf{Aceite:} fixações testadas sem peças impressas (com um bloco de madeira).
+\end{tarefa}
+
+\begin{tarefa}{T4.5}{Layout da placa perfurada}{C}{1 h}{---}
+\begin{passos}
+  \item Desenhe em papel quadriculado, em escala (um quadrado = 2,54~mm): as 2 barras fêmea
+    1 $\times$ 20 da Black Pill; a entrada de 5~V do buck; o divisor de
+    \qty{10}{\kilo\ohm}/\qty{2,2}{\kilo\ohm} e o capacitor de \qty{100}{\nano\farad} junto
+    ao PA4; o pull-down de \qty{10}{\kilo\ohm} no PB10; o conector do IBT-2 (8 vias); o do
+    MPU6050 (4 vias: 3V3, GND, SCL, SDA); o dos sensores (4 vias: 3V3, GND, A, B); o do
+    adaptador USB-serial (3 vias: GND, TX, RX).
+  \item Deixe livre o conector SWD de 4 pinos da ponta da Black Pill (ST-Link).
+  \item Ligue todos os GNDs da lógica num barramento. Um único fio de GND sai da placa para o
+    ponto de terra (borne B$-$ do IBT-2), junto com os fios de sinal.
+  \item Mantenha o divisor e o PA4 longe dos fios do motor.
+  \item Confira cada ligação do desenho contra a pinagem do apêndice~\ref{ap:pinagem}.
+\end{passos}
+\textbf{Aceite:} desenho conferido por uma pessoa da frente~D.
+\end{tarefa}
+
+\begin{tarefa}{T4.6}{Chicote do motor e conector do IBT-2}{C}{40 min}{---}
+\begin{passos}
+  \item Meça o percurso real: dos bornes M+ e M$-$ do IBT-2 (na bandeja, atrás) até o motor
+    (no topo do braço), passando pelo pivô, com o braço inclinado de um batente ao outro.
+    Some 10~cm de folga.
+  \item Corte 2 fios de 14~AWG nesse comprimento, trance (cerca de uma volta a cada 2~cm) e
+    estanhe as pontas. Ainda não solde no motor: os capacitores chegam com as compras
+    (T5.11).
+  \item Identifique o conector de 8 pinos do IBT-2: VCC, GND, R\_EN, L\_EN, RPWM, LPWM,
+    R\_IS, L\_IS. Una R\_EN e L\_EN com um jumper (os dois vão juntos no PB10).
+  \item Veja se os 50~cm de cada cor bastam também para fonte \flecha{} fusível \flecha{} botão
+    \flecha{} B+ e para fonte \flecha{} B$-$. Se não bastarem, avise a frente~A (o pedido da T1.1
+    já inclui 1~m a mais).
+\end{passos}
+\textbf{Aceite:} chicote pronto e identificado.
+\end{tarefa}
+
+\begin{tarefa}{T4.7}{Analisador lógico e roteiro de sinais}{D}{40 min}{T4.1}
+\begin{passos}
+  \item Ligue o analisador no USB, abra o PulseView, escolha o driver \cmd{fx2lafw} e faça uma
+    captura curta (1~MHz) só para confirmar que o driver funciona.
+  \item Prepare etiquetas para os fios (SCL, SDA, A, B, RPWM, LPWM, EN) e imprima a pinagem
+    do apêndice~\ref{ap:pinagem}.
+  \item Leia as tarefas T5.3 a T5.7 e T7.1 a T7.3 para não perder tempo no dia D2.
+\end{passos}
+\textbf{Aceite:} o PulseView captura e as etiquetas estão prontas.
+\end{tarefa}
+
+\begin{tarefa}{T4.8}{Acompanhar as entregas}{A}{10 min por dia}{T1.2}
+\begin{passos}
+  \item Confiram os rastreios de manhã e à tarde.
+  \item Se alguma entrega for prevista para depois de D3, comprem o item numa loja física
+    (tabela~\ref{tab:locais}).
+\end{passos}
+\textbf{Aceite:} todas as compras em mãos até D2 ou D3.
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 5: eletrônica completa antes das peças (D2)}
+\label{sec:fase5}
+
+Meta: toda a eletrônica validada antes de as peças impressas chegarem (M3). As frentes C e
+D trabalham em paralelo; no fim do dia, C, D e E fazem a integração. A frente~B separa os
+parafusos e prepara o policarbonato.
+
+\begin{atencao}[Regras de ouro da eletrônica]
+\begin{enumerate}[leftmargin=1.5em]
+  \item Toda a lógica é de \textbf{3,3~V}: MPU6050, sensores ópticos e o VCC lógico do IBT-2
+    ligam no pino 3V3 da Black Pill.
+  \item O pino 5V da Black Pill vai direto ao 5~V do USB-C. \textbf{Nunca ligue o USB-C com
+    o buck ligado.} Grave pelo ST-Link e use o adaptador USB-serial para a telemetria.
+  \item Ajuste o buck em \textbf{5,0~V antes} de ligá-lo na placa.
+  \item Só ligue os 12~V depois de conferir tudo com o multímetro.
+\end{enumerate}
+\end{atencao}
+
+\begin{tarefa}{T5.1}{Conferir a entrega das compras}{A}{20 min}{entrega}
+\begin{passos}
+  \item Confiram cada item contra a tabela~\ref{tab:compras}.
+  \item Black Pill: o chip tem que dizer \textbf{STM32F411CEU6} e o cristal (a peça metálica
+    perto do chip) \textbf{25.000}.
+  \item Separem as peças por frente.
+\end{passos}
+\textbf{Aceite:} tudo conferido (\flecha{} M2).\quad
+\textbf{Se falhar:} Black Pill errada \flecha{} segunda placa; sem segunda placa, ver o plano B
+da seção~\ref{sec:riscos}.
+\end{tarefa}
+
+\subsection{Frente D: placa, gravação e sensores na bancada}
+
+\begin{tarefa}{T5.2}{Preparar a Black Pill}{D}{20 min}{T5.1}
+\begin{passos}
+  \item Se as barras de pinos vieram soltas, solde-as com a placa encaixada numa protoboard:
+    os pinos ficam alinhados.
+  \item Solde também o conector SWD de 4 pinos da ponta da placa.
+\end{passos}
+\textbf{Aceite:} pinos retos, sem pontes de solda (confira com lupa).
+\end{tarefa}
+
+\begin{tarefa}{T5.3}{Etapa 1: gravação e telemetria, sem 12 V}{D}{45 min}{T4.1 e T5.2}
+\textbf{Material:} Black Pill, ST-Link V2, adaptador USB-serial com o jumper em 3,3~V,
+jumpers fêmea-fêmea.
+\begin{passos}
+  \item Ligue o ST-Link na Black Pill: 3V3 \flecha{} 3V3, GND \flecha{} GND, SWDIO \flecha{} DIO,
+    SWCLK \flecha{} CLK. Nada mais ligado: a placa é alimentada só pelo ST-Link.
+  \item Grave o firmware:
+\begin{comandos}
+\begin{verbatim}
+cd firmware
+pio run -t upload        # tem que terminar com "Verified OK"
+cd ..
+\end{verbatim}
+\end{comandos}
+  \item O LED da placa (PC13) dá uma piscada curta por segundo: estado PARADO.
+  \item Ligue o adaptador USB-serial: GND \flecha{} GND, RX do adaptador \flecha{} PA2, TX do
+    adaptador \flecha{} PA3. Não ligue o VCC do adaptador.
+  \item Abra a telemetria:
+\begin{comandos}
+\begin{verbatim}
+ls /dev/ttyUSB* /dev/ttyACM*           # descobre a porta do adaptador
+python tools/telemetry_log.py --porta /dev/ttyUSB0
+\end{verbatim}
+\end{comandos}
+  \item Aparece o cabeçalho e um erro do MPU6050 (esperado: ele ainda não está ligado).
+    Digite \cmd{diag}: a linha do relógio tem que dizer \cmd{cristal 25 MHz}. Digite
+    \cmd{cfg} e \cmd{?} para ver a configuração e os comandos.
+\end{passos}
+\textbf{Aceite:} \cmd{Verified OK}, LED piscando uma vez por segundo, \cmd{diag} respondendo
+com \cmd{cristal 25 MHz}.
+
+\textbf{Se falhar:}
+\begin{itemize}
+  \item a gravação falha \flecha{} confira SWDIO e SWCLK (trocados é o erro mais comum); segure o
+    botão NRST, mande gravar e solte o botão logo que a conexão começar; troque o cabo USB
+    do ST-Link;
+  \item continua falhando \flecha{} DFU, \textbf{sem o buck ligado}: conecte o USB-C, segure
+    BOOT0, aperte e solte NRST, solte BOOT0 e rode \cmd{pio run -e blackpill_dfu -t upload}
+    dentro de \arq{firmware/};
+  \item o relógio diz \cmd{INTERNO} \flecha{} o cristal não partiu; o firmware funciona, mas
+    anote para o relatório;
+  \item nada aparece na serial \flecha{} TX e RX trocados, ou adaptador em 5~V.
+\end{itemize}
+\end{tarefa}
+
+\begin{tarefa}{T5.4}{MPU6050 na bancada}{D}{20 min}{T5.3}
+\begin{passos}
+  \item Com a placa desligada (ST-Link fora do USB), ligue o MPU6050 com fios curtos:
+    VCC \flecha{} 3V3, GND \flecha{} GND, SCL \flecha{} PB6, SDA \flecha{} PB7. AD0 em GND ou solto; INT
+    sem ligar.
+  \item Religue e abra a telemetria. \cmd{diag}: \cmd{WHO_AM_I=0x68} e \cmd{erros_i2c=0}.
+    Os valores 0x70, 0x72 e 0x98 também servem: são chips compatíveis aceitos pelo
+    firmware. O valor 0x00 significa que o módulo não respondeu.
+  \item Segure o módulo com o eixo Y (seta impressa na placa) apontando para cima: aceleração
+    em y \aprox{} +1~g, em x e z perto de 0.
+  \item Digite \cmd{sinais} e gire o módulo no próprio plano (em torno do eixo Z), para lá e
+    para cá, por 3~s. O firmware responde ``giroscopio OK'' ou ``INVERTIDO''.
+  \item Anote o resultado. A conferência que vale é com o MPU6050 no braço (T7.1).
+\end{passos}
+\textbf{Aceite:} o MPU6050 responde e \cmd{erros_i2c} fica parado em 0.\quad
+\textbf{Se falhar:} SCL e SDA trocados, mau contato ou módulo sem alimentação.
+\end{tarefa}
+
+\begin{tarefa}{T5.5}{Sensores ópticos na bancada}{D}{20 min}{T5.3}
+\begin{passos}
+  \item Ligue os dois sensores: VCC \flecha{} 3V3, GND \flecha{} GND, D0 do sensor~A \flecha{} PA15,
+    D0 do sensor~B \flecha{} PB3. O pino A0 fica sem ligar.
+  \item Passe um cartão na fenda de cada sensor: o LED do módulo acende e apaga e a contagem
+    do encoder (\cmd{diag}) muda. Com só um sensor mudando, a contagem sobe e desce 1: é
+    normal no modo encoder. A quadratura de verdade só aparece com a roda (T7.2).
+  \item No PulseView: canal 0 em PA15, canal 1 em PB3, GND comum, 1~MHz. Passe o cartão
+    devagar: as bordas têm que ser limpas, sem repiques.
+\end{passos}
+\textbf{Aceite:} os dois sensores mudam a contagem e as bordas são limpas.
+\end{tarefa}
+
+\begin{tarefa}{T5.6}{Opcional: conferir o PWM no analisador}{D}{20 min}{T5.3}
+Útil quando a placa de potência atrasa: confirma o PWM antes da etapa~4.
+\begin{passos}
+  \item Em \arq{firmware/include/board.h}, mude temporariamente
+    \texttt{\#define USE\_VBUS\_SENSE 1} para \cmd{0} e grave.
+  \item No PulseView: canal 0 em PB0, canal 1 em PB1, canal 2 em PB10; 4~MHz.
+  \item \cmd{m 10}: PB10 em nível alto e PWM de 20~kHz com cerca de 10\,\% num dos pinos PB0
+    ou PB1. \cmd{s} desliga tudo. \cmd{m -10}: o PWM passa para o outro pino.
+  \item \textbf{Volte \cmd{USE_VBUS_SENSE} para 1 e grave de novo.} Confira com \cmd{diag}
+    que o \cmd{vbus} voltou a ser medido (\aprox{} 0~V sem a fonte).
+\end{passos}
+\textbf{Aceite:} PWM de 20~kHz nos dois sentidos e \cmd{USE_VBUS_SENSE} de volta em 1.
+\end{tarefa}
+
+\begin{tarefa}{T5.7}{Chicote de sinal do braço}{D}{45 min}{T4.7}
+\begin{passos}
+  \item Meça o percurso do conector da placa (na bandeja) até o MPU6050 (atrás do braço,
+    48~mm acima do pivô) e até os sensores (na frente do braço), passando perto do pivô,
+    com o braço inclinado de $-25$° a $+25$°. Some 10~cm.
+  \item MPU6050: 4 fios (3V3, GND, SCL, SDA) trançados juntos. Sensores: 4 fios (3V3, GND,
+    A, B).
+  \item Use fio de 22 a 24~AWG, conectores nas duas pontas (o braço precisa sair sem
+    dessoldar nada) e termo-retrátil nas emendas.
+  \item Passe o chicote longe do chicote do motor, de preferência do outro lado do braço.
+\end{passos}
+\textbf{Aceite:} continuidade de ponta a ponta em cada fio e etiquetas no lugar.
+\end{tarefa}
+
+\subsection{Frente C: alimentação e proteções}
+
+\begin{tcolorbox}[enhanced, colback=black!3, colframe=black!40, boxrule=0.5pt, arc=1.5pt,
+    title={Esquema de alimentação (de \arq{docs/ligacoes.md})},
+    fonttitle=\sffamily\bfseries\small, colbacktitle=black!60, coltitle=white,
+    fontupper=\footnotesize]
+\begin{verbatim}
+Fonte 12 V (+) -- fusível 10 A --+-- botão de emergência (NF) --+-- IBT-2 B+
+                                 |                              +-- 2x 4700 uF + 100 nF + TVS
+                                 |                              +-- 10 k -- PA4 -- 2,2 k -- GND
+                                 +-- buck IN+ ... buck OUT+ (5,0 V) -- Black Pill 5V
+Fonte 12 V (-) -- ponto de terra em estrela no B- do IBT-2
+                  (buck IN-, buck OUT- e o GND da lógica saem daqui)
+\end{verbatim}
+\end{tcolorbox}
+
+\begin{tarefa}{T5.8}{Montar a placa perfurada}{C}{2,5 h}{T4.5 e T5.1}
+\begin{passos}
+  \item Soquete: encaixe as barras fêmea nos pinos da Black Pill, posicione o conjunto na
+    placa perfurada e solde com a Black Pill encaixada (fica alinhado). Depois retire a
+    placa.
+  \item Solde os conectores conforme o desenho da T4.5.
+  \item Divisor do barramento: \qty{10}{\kilo\ohm} do borne ``B+ depois do botão'' até o
+    PA4; \qty{2,2}{\kilo\ohm} do PA4 ao GND; \qty{100}{\nano\farad} do PA4 ao GND, junto ao
+    pino. A 16,5~V o pino fica em 2,97~V, dentro do limite do ADC.
+  \item Pull-down: \qty{10}{\kilo\ohm} do PB10 ao GND (a ponte fica desligada enquanto a placa
+    reinicia).
+  \item Conector do IBT-2: 3V3 \flecha{} VCC, GND \flecha{} GND, PB10 \flecha{} R\_EN e L\_EN,
+    PB0 \flecha{} RPWM, PB1 \flecha{} LPWM. R\_IS e L\_IS ficam sem ligar
+    (\cmd{USE_CURRENT_SENSE 0}).
+  \item Saída do buck: + \flecha{} pino 5V da Black Pill; $-$ \flecha{} GND. Ainda não ligue o buck
+    na placa: ele é ajustado na T5.10.
+\end{passos}
+\textbf{Aceite:} inspeção com lupa sem pontes de solda e ligações conferidas contra o
+apêndice~\ref{ap:pinagem} por uma segunda pessoa.
+\end{tarefa}
+
+\begin{tarefa}{T5.9}{Potência e proteções}{C}{1 h}{T4.6 e T5.1}
+\begin{passos}
+  \item Porta-fusível logo na saída do positivo da fonte, com fio de 14~AWG.
+  \item Botão de emergência NF em série \textbf{só} no ramo do IBT-2. O buck é ligado antes
+    do botão: a placa continua viva e o firmware vê a tensão do motor sumir.
+  \item Junto aos bornes B+ e B$-$ do IBT-2: os 2 eletrolíticos de \qty{4700}{\micro\farad}
+    (lado marcado com $-$ no B$-$), o \qty{100}{\nano\farad} e a TVS SMBJ15A com o
+    \textbf{catodo (faixa) no B+}. Fica mais fácil num pedaço de placa perfurada com 2
+    bornes, encostado ao IBT-2.
+  \item Negativo da fonte direto ao B$-$ do IBT-2 (ponto de terra em estrela). Dali saem o
+    IN$-$ do buck e o GND da lógica.
+  \item Isole tudo com termo-retrátil.
+\end{passos}
+\textbf{Aceite:} ligações conferidas contra o esquema por uma segunda pessoa.
+\end{tarefa}
+
+\begin{tarefa}{T5.10}{Ajustar o buck e energizar sem a Black Pill}{C}{30 min}{T5.8 e T5.9}
+\begin{passos}
+  \item Antes de ligar: multímetro em continuidade. Sem curto entre 12~V e GND, 5~V e GND,
+    3V3 e GND (nos eletrolíticos a leitura sobe aos poucos: é a carga deles). PB10--GND
+    \aprox{} \qty{10}{\kilo\ohm}; PA4--GND \aprox{} \qty{2,2}{\kilo\ohm}.
+  \item Botão de emergência, com a fonte desligada: solto = fechado (o multímetro apita);
+    apertado = aberto.
+  \item Desconecte a saída do buck da placa. Ligue a fonte e ajuste o trimpot do buck até
+    \textbf{5,00~V} na saída, sem carga.
+  \item Desligue, reconecte o buck na placa (sem a Black Pill no soquete) e ligue de novo.
+    Meça: B+ \aprox{} 12~V; pino 5V do soquete = 5,0~V; pino PA4 do soquete \aprox{}
+    2,16~V ($12 \times 2{,}2 / 12{,}2$).
+  \item Desligue a fonte. Os capacitores do barramento continuam carregados por alguns
+    minutos (só descarregam pelo divisor): não encoste ferramentas nos bornes do IBT-2.
+\end{passos}
+\textbf{Aceite:} 5,0~V, 12~V e 2,16~V medidos; o botão abre e fecha.
+\end{tarefa}
+
+\begin{tarefa}{T5.11}{Capacitores e chicote do motor}{C}{30 min}{T4.6 e T5.1}
+\begin{passos}
+  \item Solde 3 capacitores cerâmicos de \qty{100}{\nano\farad} no motor: um entre os dois
+    terminais e um de cada terminal até a carcaça (raspe um ponto da carcaça para a solda
+    pegar). Eles cortam a maior parte do ruído que trava o I2C.
+  \item Solde o chicote trançado de 14~AWG nos terminais e isole com termo-retrátil.
+  \item Ligue a outra ponta nos bornes M+ e M$-$ do IBT-2.
+\end{passos}
+\textbf{Aceite:} soldas firmes e nenhuma continuidade entre terminal e carcaça.
+\end{tarefa}
+
+\subsection{Frentes C, D e E: integração}
+
+\begin{tarefa}{T5.12}{Integração da eletrônica}{C, D e E}{30 min}{T5.3 e T5.10}
+\begin{passos}
+  \item Com a fonte desligada, encaixe a Black Pill no soquete.
+  \item ST-Link: só GND, SWDIO e SWCLK. O 3V3 dele \textbf{não} se liga quando a placa é
+    alimentada pelo buck. Adaptador USB-serial: só GND, TX e RX.
+  \item Ligue a fonte. O LED pisca uma vez por segundo. \cmd{diag}: \cmd{vbus} \aprox{}
+    12~V.
+  \item Compare o \cmd{vbus} com o multímetro no B+. Se a diferença passar de 3\,\%, corrija
+    \cmd{VBUS_DIVIDER} em \arq{firmware/include/board.h}:
+    $\text{novo} = 5{,}545 \times V_\text{multímetro} / V_\text{diag}$. Grave e confira de
+    novo.
+  \item Ligue o MPU6050 e os sensores pelos conectores definitivos e confira com \cmd{diag}.
+\end{passos}
+\textbf{Aceite:} \cmd{vbus} a $\pm$3\,\% do multímetro e \cmd{erros_i2c=0}.
+\end{tarefa}
+
+\begin{tarefa}{T5.13}{Etapa 4 adaptada: motor na morsa, sem roda}{C, D e E}{45 min}{T4.4, T5.11 e T5.12}
+\textbf{Segurança:} motor bem preso, só com o flange (sem a roda), óculos e mão no botão de
+emergência.
+\begin{passos}
+  \item Prenda o motor na morsa (pano na carcaça), com o eixo livre e o flange montado.
+  \item Encoste os fios do MPU6050 nos fios do motor, como eles vão ficar no braço: o teste
+    de ruído só vale assim.
+  \item \cmd{m 10}: o motor gira devagar. \cmd{s} para. \cmd{m -10}: gira ao contrário.
+    \cmd{s}.
+  \item \cmd{m 30} por 5~s e depois \cmd{diag}: \cmd{erros_i2c} não pode subir.
+  \item Com o motor girando (\cmd{m 20}), aperte o botão de emergência: o firmware acusa
+    ``sem tensao'' (falha~4; o LED dá 4 piscadas a cada 3~s). Solte o botão; \cmd{s} volta a
+    PARADO.
+  \item O ensaio em malha aberta desliga sozinho 15~s depois do primeiro \cmd{m}: é normal.
+\end{passos}
+\textbf{Aceite:} o motor gira nos dois sentidos, \cmd{erros_i2c=0} e o botão provoca a
+falha~4 (\flecha{} M3).
+
+\textbf{Se falhar:}
+\begin{itemize}
+  \item o motor não gira, mas o PWM chega (analisador) \flecha{} o IBT-2 não aceita 3,3~V no VCC:
+    ligue o VCC dele em 5~V (saída do buck) e confira de novo no analisador se RPWM e LPWM
+    chegam;
+  \item \cmd{erros_i2c} sobe \flecha{} capacitores no motor, fios do motor trançados e afastados
+    do I2C, fios do I2C mais curtos;
+  \item falha~4 sem apertar o botão \flecha{} fonte fraca (cai abaixo de 9~V na partida) ou mau
+    contato no fusível ou no botão.
+\end{itemize}
+\end{tarefa}
+
+\subsection{Frente B: parafusos e proteção}
+
+\begin{tarefa}{T5.14}{Separar os 12 conjuntos M8}{B}{30 min}{T5.1}
+\begin{passos}
+  \item Monte os 14 conjuntos como vão na roda: parafuso M8 $\times$ 16, arruela e porca.
+  \item Pese cada um. Com balança de 0,1~g, separe 12 conjuntos com $\pm$0,5~g; com a de
+    1~g, separe os 12 de mesma leitura.
+  \item Anote a massa média: ela vai para \cmd{Roda.m_conjunto} em \arq{sim/params.py}
+    (T6.7). O valor atual, 24~g, foi estimado para parafusos de 25~mm.
+\end{passos}
+\textbf{Aceite:} 12 conjuntos separados e massa média anotada.
+\end{tarefa}
+
+\begin{tarefa}{T5.15}{Preparar o policarbonato}{B}{30 min}{T5.1}
+\begin{passos}
+  \item Placa de 230 $\times$ 230~mm. Se não veio cortada, corte com serra tico-tico de
+    lâmina fina ou serra para metal, devagar, com a placa presa entre duas tábuas.
+  \item Marque os 2 furos de \textbf{3,5~mm}: a \textbf{20~mm da borda de baixo} (a que
+    entra nas ranhuras dos postes) e a \textbf{55~mm de cada borda lateral} (120~mm entre os
+    centros). Não é preciso imprimir o gabarito SVG.
+  \item Marque com punção leve e fure em baixa rotação, com madeira por baixo e sem forçar:
+    o policarbonato racha perto da borda.
+  \item Mantenha a película protetora até a montagem.
+\end{passos}
+\textbf{Aceite:} furos no lugar, 120~mm entre os centros.
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 6: montagem mecânica (D3)}
+\label{sec:fase6}
+
+Começa quando as peças passam pela inspeção (T3.4). Quatro subconjuntos andam em paralelo
+(braço e roda, base, sensores e MPU6050, bandeja), e no fim vem o pivô, que une tudo.
+
+\begin{tarefa}[critica]{T6.1}{Insertos térmicos}{B e A}{30 min}{T3.4}
+\textbf{Material:} ferro de solda com ponta cônica ou ponta própria para insertos, 16
+insertos M3 (mais 2 de reserva).
+
+\textbf{Locais (16):} roda, 4 (lado de trás do cubo, onde encosta o flange); braço, 2 na
+frente (suporte dos sensores) e 2 atrás (MPU6050); base, 2 no topo dos suportes da barra,
+4 nas colunas da bandeja e 2 na parte de trás dos postes da proteção.
+\begin{passos}
+  \item Ferro a cerca de 220~°C. Apoie o inserto reto no furo.
+  \item Empurre devagar, sem forçar, até ele ficar 0,2~mm abaixo da superfície.
+  \item Retire o ferro e, se precisar, assente o inserto com uma superfície plana e fria
+    por 5~s.
+  \item Com dois ferros, duas pessoas: uma faz a roda e o braço, a outra a base.
+\end{passos}
+\textbf{Aceite:} insertos retos; um parafuso M3 entra em cada um sem travar.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T6.2}{Subconjunto braço e roda}{B}{1,5 h}{T6.1 e T5.14}
+\begin{passos}
+  \item \textbf{Rolamentos}: encaixe os dois 608-ZZ nos assentos do braço (o da frente na
+    face que ficou para baixo na impressão, o de trás na ponta do tubo). Se estiverem justos,
+    prense na morsa com mordente macio; se estiverem folgados, use uma gota de cola no anel
+    externo, nunca no interno.
+  \item Pese o braço com os rolamentos e os insertos (vai para a T6.7).
+  \item \textbf{Motor}: carcaça no rebaixo de trás do braço, presa por 2 parafusos
+    M4 $\times$ 8 pela frente. Nunca use parafusos mais compridos: eles tocam o enrolamento.
+  \item \textbf{Flange}: no eixo do motor, com o cubo a cerca de 2~mm do ressalto (o
+    \cmd{folgas.py} prevê 1,9~mm). Parafusos de trava no lado plano do eixo, com trava-rosca.
+    Espere pelo menos 30~min antes de girar o motor com a roda.
+  \item \textbf{Roda}: 12 conjuntos M8 (cabeça e arruela na frente, porca no alojamento de
+    trás), bem apertados em cruz. Depois prenda a roda no flange com 4 M3 $\times$ 8 nos
+    insertos.
+  \item \textbf{Balanceamento}: gire a roda com a mão várias vezes. Ela tem que parar em
+    posições aleatórias. Se parar sempre com o mesmo lado para baixo, troque parafusos de
+    lugar (o mais pesado para o lado que fica em cima) até melhorar.
+\end{passos}
+\textbf{Aceite:} a roda gira livre, sem bater, e para em posições aleatórias.
+\end{tarefa}
+
+\begin{tarefa}{T6.3}{Subconjunto base, bandeja e proteção}{A}{1 h}{T6.1}
+\begin{passos}
+  \item \textbf{Almofadas}: cole as 2 almofadas de TPU (ou de EVA de 3~mm cortado em
+    37,8 $\times$ 16~mm) nas faces inclinadas dos batentes. Cola de contato nas duas faces,
+    espere de 10 a 15~min até secar ao toque e pressione.
+  \item Prenda a base na mesa (furos dos cantos ou 2 sargentos).
+  \item Bandeja nas 4 colunas, com M3 $\times$ 8 nos insertos.
+  \item \textbf{Proteção}: placa de policarbonato nas ranhuras dos postes e 2 M3 $\times$ 16
+    nos insertos de trás dos postes. Pode ficar para depois do pivô, se atrapalhar.
+\end{passos}
+\textbf{Aceite:} base firme na mesa; bandeja e proteção presas.
+\end{tarefa}
+
+\begin{tarefa}{T6.4}{Sensores e MPU6050 no braço}{D}{45 min}{T6.2 e T5.7}
+Os passos 1, 2 e 4 podem começar enquanto a frente~B monta a roda.
+\begin{passos}
+  \item Suporte dos sensores na frente do braço: 2 M3 $\times$ 10 nos insertos, pelos rasgos
+    verticais, ainda frouxos.
+  \item Sensores deitados na prateleira, com as torres para cima, presos por M3 $\times$ 10
+    e porca por baixo, nas marcas de posição.
+  \item Ajuste a altura do suporte até o anel dentado ficar centrado na fenda e os LEDs dos
+    módulos piscarem ao girar a roda devagar. Aperte.
+  \item MPU6050 atrás do braço, com espaçadores de 3~mm e 2 M3 $\times$ 12, com o eixo Y do
+    módulo apontando para o motor.
+  \item Ligue o chicote de sinal (T5.7) e prenda-o ao braço com folga perto do pivô.
+\end{passos}
+\textbf{Aceite:} os LEDs piscam ao girar a roda devagar e o anel não encosta nas torres.
+\end{tarefa}
+
+\begin{tarefa}{T6.5}{Eletrônica na bandeja}{C}{1 h}{T6.3 e M3}
+\begin{passos}
+  \item Parafuse a placa da Black Pill, o IBT-2 e o buck na grade de furos M3 da bandeja
+    (M3 com porca; espaçadores se precisar).
+  \item Faça a fiação de potência e de sinal conforme o apêndice~\ref{ap:pinagem}, com os
+    fios passando por baixo da bandeja.
+  \item Deixe a fonte, o fusível e o botão de emergência fora da base, ao alcance da mão de
+    quem opera o PC.
+\end{passos}
+\textbf{Aceite:} nada solto e o botão de emergência alcançável.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T6.6}{Pivô: unir o braço e a base}{B e A}{30 min}{T6.2, T6.3 e T4.3}
+\begin{passos}
+  \item Passe a barra pelo suporte da frente, colar da frente, braço, colar de trás e suporte
+    de trás.
+  \item Aperte os parafusos de trava (M3 $\times$ 12) dos suportes da barra.
+  \item Encoste os colares nos anéis internos dos rolamentos, com a folga de uma folha de
+    papel, e aperte.
+  \item O braço tem que cair livre de um lado para o outro até os batentes.
+  \item Prenda os fios do braço com folga para ele ir de um batente ao outro; teste com a
+    mão.
+  \item Ligue o motor e os conectores de sinal na bandeja. Coloque a proteção, se ainda não
+    estiver.
+\end{passos}
+\textbf{Aceite:} braço livre de batente a batente, sem raspar, e fios sem esticar
+(\flecha{} M5).
+\end{tarefa}
+
+\begin{tarefa}{T6.7}{Pesar e atualizar o modelo}{E}{20 min}{T3.4, T5.14 e T6.2}
+\begin{passos}
+  \item Atualize \arq{sim/params.py} com as massas medidas:
+    \begin{itemize}
+      \item \cmd{Roda.preenchimento} $= 0{,}85 \times m_\text{roda} / 81{,}8$~g, com a massa
+        da roda impressa antes dos insertos (T3.4);
+      \item \cmd{Roda.m_conjunto}: massa média dos conjuntos M8 (T5.14);
+      \item \cmd{m_braco}: braço com rolamentos, insertos e parafusos, sem o motor (T6.2);
+      \item \cmd{m_extras}: suporte, 2 sensores, MPU6050, espaçadores e os parafusos deles.
+    \end{itemize}
+  \item Regenere tudo e grave (apêndice~\ref{ap:comandos}). Anote o novo $K$ que o
+    \cmd{export_gains} imprime.
+\end{passos}
+\textbf{Aceite:} regeneração sem erro e firmware gravado.
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 7: testes com o pêndulo montado (D3 tarde e D4 manhã)}
+\label{sec:fase7}
+
+\begin{atencao}[Segurança em todos os testes com a roda]
+Óculos de proteção sempre; proteção de policarbonato no lugar; ninguém no plano da roda;
+mão no botão de emergência nos primeiros testes com motor. Grave log de tudo: os logs viram
+os gráficos do relatório.
+\end{atencao}
+
+\begin{tarefa}[critica]{T7.1}{Etapa 2 final: MPU6050 no braço}{D}{15 min}{M5}
+\begin{passos}
+  \item Braço em pé e parado (segure na vertical). \cmd{diag}: aceleração em y \aprox{}
+    +1~g, em x e z perto de 0. Se o +1~g aparecer noutro eixo, a montagem difere da
+    prevista: ajuste \cmd{IMU_ACC_UP_AXIS}, \cmd{IMU_ACC_SIDE_AXIS} e \cmd{IMU_GYRO_AXIS} em
+    \arq{firmware/include/board.h} e grave.
+  \item \cmd{erros_i2c} parado em 0.
+  \item \cmd{sinais} e balance o braço com a mão por 3~s. Se a resposta for ``INVERTIDO'',
+    use \cmd{inv giro} e anote para fixar em \arq{board.h}.
+  \item Encoste o braço no batente da esquerda e no da direita: a coluna
+    \cmd{theta_graus} marca de $\pm$22° a $\pm$25°.
+\end{passos}
+\textbf{Aceite:} os quatro itens conferidos.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T7.2}{Etapa 3: encoder óptico}{D}{30 a 60 min}{T7.1}
+\begin{passos}
+  \item Gire a roda devagar com a mão: os LEDs dos dois módulos piscam.
+  \item Faça uma marca na roda e dê \textbf{uma volta exata}: a coluna \cmd{encoder} muda
+    \textbf{160 $\pm$ 2} contagens. Volte: ela retorna ao valor inicial.
+  \item Se mudar só 40 ou 80, ou andar e voltar, os sensores não estão em quadratura: deslize
+    um deles nos rasgos da prateleira (alguns décimos de milímetro) e repita. Os centros
+    ópticos devem ficar a 12,2~mm um do outro.
+  \item No PulseView (canais em PA15 e PB3): ondas quadradas com defasagem de cerca de 90° e
+    sem repiques nas bordas.
+\end{passos}
+\textbf{Aceite:} 160 $\pm$ 2 contagens por volta nos dois sentidos.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T7.3}{Etapa 5: identificação do motor}{E e D}{45 min}{T7.2, T4.2 e M3}
+\textbf{Preparação:} proteção no lugar; braço preso na vertical (sargento ou mão firme);
+óculos; pelo menos 30~min de cura do trava-rosca.
+\begin{passos}
+  \item Abra a telemetria gravando num arquivo com nome:
+\begin{comandos}
+\begin{verbatim}
+python tools/telemetry_log.py --porta /dev/ttyUSB0 --saida logs/etapa5_motor.csv
+\end{verbatim}
+\end{comandos}
+  \item \textbf{Primeira parte}: \cmd{m 10}, espere 4~s; \cmd{m 20}, 4~s; \cmd{m 30}, 4~s;
+    \cmd{s}.
+  \item \textbf{Segunda parte}, logo em seguida: \cmd{m 40}, 4~s; \cmd{s}. O ensaio é feito
+    em duas partes, no mesmo log, porque o firmware encerra o modo MANUAL 15~s depois do
+    primeiro \cmd{m}.
+  \item A roda tem que girar no sentido que deixa \cmd{roda_rpm} positivo. Se ficar negativo,
+    o firmware avisa: use \cmd{inv enc}, anote para fixar em \arq{board.h} e repita.
+  \item Saia com Ctrl+C (o programa manda \cmd{s} ao sair) e rode, com o R medido na T4.2:
+\begin{comandos}
+\begin{verbatim}
+python tools/identify.py motor logs/etapa5_motor.csv --R 0.8
+\end{verbatim}
+\end{comandos}
+  \item Confira a ordem de grandeza: $k_e$ perto de 0,0275~V$\cdot$s/rad, constante de tempo
+    perto de 0,9~s (é por isso que cada patamar dura 4~s) e $I_w$ perto de
+    0,86~g$\cdot$m$^2$. Diferenças de 20 a 30\,\% são normais; muito mais que isso pede
+    conferir o encoder (T7.2) e o R.
+  \item Coloque \cmd{R}, \cmd{n0_rpm} e \cmd{i0} em \arq{sim/params.py} (classe
+    \cmd{Motor}), como o \cmd{identify.py} imprime. Regenere tudo e grave
+    (apêndice~\ref{ap:comandos}).
+  \item \cmd{diag}: \cmd{erros_i2c} continua 0 depois de a roda girar.
+\end{passos}
+\textbf{Aceite:} identificação sem erro e parâmetros regenerados e gravados.\quad
+\textbf{Se falhar:} ``Inclinação negativa'' \flecha{} \cmd{inv enc}; ``Preciso de pelo menos 2
+patamares'' \flecha{} patamares curtos demais (menos de 1,5~s): repita.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T7.4}{Etapa 6: pêndulo pendurado}{E e B}{30 min}{T7.3}
+\begin{passos}
+  \item Desligue a fonte. Solte a base da mesa e prenda-a de cabeça para baixo na borda da
+    mesa, com o braço pendurado e livre (cuidado com os fios e a bandeja). Se a base estiver
+    atrasada: a sobra de 168~mm da barra presa na morsa na horizontal, braço pendurado nos
+    rolamentos e colares travando.
+  \item Ligue a fonte e abra a telemetria com \cmd{--saida logs/etapa6_pendulo.csv}, com o
+    controle PARADO. Afaste o braço cerca de 10° e solte. Grave 20~s.
+  \item Rode \cmd{python tools/identify.py pendulo logs/etapa6_pendulo.csv}. O ângulo fica
+    perto de $\pm$180°: é normal, o programa trata disso. Período esperado \aprox{} 0,63~s
+    ($Mgl/J$ \aprox{} 101~(rad/s)$^2$ no modelo).
+  \item Se $Mgl/J$ diferir mais de 10\,\% do modelo, pese as peças de novo e confira
+    \cmd{l_w} e \cmd{frac_cm_braco} em \arq{sim/params.py}.
+  \item Coloque o \cmd{b_p} medido em \arq{sim/params.py}, regenere tudo e grave.
+\end{passos}
+\textbf{Aceite:} $Mgl/J$ a $\pm$10\,\% do modelo e \cmd{b_p} atualizado.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T7.5}{Etapa 7: conferência de sentido e primeiro equilíbrio}{E e D}{1 a 3 h}{T7.4}
+Base de volta na posição normal e presa na mesa; proteção no lugar; óculos; mão no botão.
+
+\textbf{Conferência de sentido (obrigatória antes de equilibrar):}
+\begin{passos}
+  \item \cmd{m 20}: a roda gira num sentido (olhe de frente). \cmd{s}.
+  \item Incline o braço com a mão \textbf{no mesmo sentido em que a roda girou}: a coluna
+    \cmd{theta_graus} tem que \textbf{aumentar}.
+  \item Se diminuir, use \cmd{inv ang} \textbf{e} \cmd{inv giro} (os dois juntos) e anote
+    para fixar em \arq{board.h}. Com o sentido errado o controle empurra o pêndulo para o
+    chão.
+\end{passos}
+\textbf{Primeiro equilíbrio, com corrente limitada:}
+\begin{passos}[resume]
+  \item \cmd{imax 4}.
+  \item Braço encostado no batente e parado: aperte o botão KEY da placa (ou \cmd{a}). O LED
+    pisca rápido por 1~s (CALIBRA: não mexa) e depois pisca médio (ARMADO).
+  \item Leve o braço devagar até a vertical e segure de leve. A menos de 3° e quase parado, o
+    controle assume (LED aceso, EQUILIBRA). Solte.
+  \item Se equilibrar: \cmd{imax 7} e depois \cmd{imax 10}.
+  \item Ajuste pelos sintomas do apêndice~\ref{ap:sintomas}. Mudanças feitas pela serial se
+    perdem ao desligar.
+  \item Fixe em \arq{firmware/include/board.h} todo sinal trocado pela serial, grave e
+    confira com \cmd{cfg} depois de desligar e ligar a placa.
+\end{passos}
+\textbf{Aceite:} equilibra sozinho por 30~s com \cmd{imax 10} (\flecha{} M6).
+\end{tarefa}
+
+% =====================================================================
+\section{Fase 8: configuração final e ensaios (D4 tarde)}
+\label{sec:fase8}
+
+\begin{tarefa}[critica]{T8.1}{Congelar a configuração}{E}{30 min}{T7.5}
+\begin{passos}
+  \item \arq{firmware/include/board.h}: eixos (\cmd{IMU_GYRO_AXIS}, \cmd{IMU_ACC_UP_AXIS},
+    \cmd{IMU_ACC_SIDE_AXIS}) conforme a T7.1; sinais (\cmd{IMU_GYRO_SIGN},
+    \cmd{IMU_ANGLE_SIGN}, \cmd{ENC_SIGN}, \cmd{MOTOR_SIGN}) conforme os \cmd{inv} usados;
+    \cmd{USE_VBUS_SENSE 1}; \cmd{VBUS_DIVIDER} calibrado na T5.12; \cmd{USE_CURRENT_SENSE 0}
+    (ou 1, só se R\_IS e L\_IS estiverem ligados em PA5 e PA6 com divisor de
+    \qty{10}{\kilo\ohm}/\qty{10}{\kilo\ohm}).
+  \item \arq{sim/params.py}: todos os valores \cmd{MEDIR} com o valor medido (apêndice~C
+    preenchido).
+  \item Ganhos ajustados à mão (\cmd{k1}, \cmd{k2}, \cmd{k3} pela serial): para que fiquem no
+    firmware, mude os pesos do LQR em \arq{sim/controlador.py} e regenere até o $K$
+    impresso pelo \cmd{export_gains} ficar perto do valor achado. Em geral, $|K_1|$ maior
+    pede \cmd{DESVIO_THETA} menor (hoje 3°); $|K_2|$ menor pede \cmd{DESVIO_THETA_DOT}
+    maior (hoje 0,5~rad/s); a roda voltar mais depressa a zero pede \cmd{DESVIO_OMEGA}
+    menor (hoje 50~rad/s). Confira sempre o $K$ impresso. A alternativa é registrar os
+    valores no relatório.
+  \item Regenere tudo e grave (apêndice~\ref{ap:comandos}).
+  \item Desligue e ligue a placa: \cmd{cfg} tem que mostrar os sinais e os ganhos
+    definitivos sem nenhum comando pela serial.
+\end{passos}
+\textbf{Aceite:} 34 + 23 testes passando e \cmd{cfg} correto depois de religar.
+\end{tarefa}
+
+\begin{tarefa}[critica]{T8.2}{Lista de aceite do hardware}{todas}{45 min}{T8.1}
+\begin{checklist}
+  \item \cmd{diag} depois de 5~min equilibrando: \cmd{cristal 25 MHz} (ou \cmd{INTERNO}
+    anotado), \cmd{erros_i2c=0} e \cmd{periodos_perdidos=0}.
+  \item \cmd{vbus} do \cmd{diag} a $\pm$3\,\% do multímetro.
+  \item Encoder: 160 $\pm$ 2 contagens por volta; \cmd{roda_rpm} positivo com \cmd{m 20}.
+  \item Ângulo: de $\pm$22° a $\pm$25° nos batentes.
+  \item Equilíbrio de 30~s sem tocar, sem a roda disparar (sem falha~2).
+  \item Recuperação: solto de 10°, o braço volta à vertical.
+  \item Botão de emergência com o pêndulo equilibrando: falha~4 e a roda para.
+  \item Braço empurrado além de 20°: falha~1 (inclinação) com freio dinâmico.
+  \item SDA do MPU6050 desconectado com o pêndulo ARMADO (motor parado): falha~3.
+    Reconecte; \cmd{s} volta a PARADO.
+  \item Depois de cada falha, \cmd{s} (ou KEY) volta a PARADO.
+  \item A configuração persiste depois de desligar e ligar (T8.1, passo~5).
+\end{checklist}
+\textbf{Aceite:} todos os itens marcados (\flecha{} M7).
+\end{tarefa}
+
+\begin{tarefa}{T8.3}{Etapa 8: ensaios para o relatório}{todas}{1,5 h}{T8.2}
+Cada ensaio num log separado (\cmd{--saida logs/etapa8_NOME.csv}), com o gráfico gerado por
+\cmd{python tools/plot_log.py logs/etapa8_NOME.csv}:
+\begin{passos}
+  \item \textbf{Equilíbrio parado}: 30~s sem tocar; desvio RMS do ângulo e da roda.
+  \item \textbf{Peteleco}: toques no braço com intensidade crescente; o maior que ele aguenta.
+  \item \textbf{Recuperação}: soltar de 5°, 10° e 15° (o modelo prevê até cerca de 20°).
+  \item \textbf{Peso extra}: 20~g presos no topo do braço; repetir o equilíbrio.
+  \item \textbf{Erro de montagem}: \cmd{trim 2} e mostrar o auto-ajuste corrigindo sozinho.
+\end{passos}
+Para comparar com o modelo, \cmd{python -m sim.lqr_design} gera os mesmos gráficos em
+\arq{sim/out/}.
+
+\textbf{Aceite:} 5 logs com gráficos.
+\end{tarefa}
+
+\begin{tarefa}{T8.4}{Fechar a documentação}{A}{30 min}{T8.3}
+\begin{passos}
+  \item Copiem \arq{logs/} e as fotos para uma pasta do grupo.
+  \item Passem para o quadro os valores finais (apêndice~\ref{ap:parametros}) e as
+    observações (relógio \cmd{INTERNO}, troca de eixos, ganhos ajustados à mão).
+  \item Atualizem \arq{docs/testes_bancada.md} se algo mudou; por exemplo, a etapa~5 em duas
+    partes e a regeneração completa do apêndice~\ref{ap:comandos}.
+\end{passos}
+\textbf{Aceite:} logs, fotos e valores guardados.
+\end{tarefa}
+
+% =====================================================================
+\section{Riscos e planos B}
+\label{sec:riscos}
+
+{\small
+\needspace{8\baselineskip}
+\noindent\begin{minipage}{\linewidth}\captionof{table}{Riscos, sinais de alerta e planos B.}\label{tab:riscos}\end{minipage}
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}Xc@{}}
+\toprule
+Risco & Sinal de alerta & Plano B & Frente \\
+\midrule
+\endfirsthead
+\toprule
+Risco & Sinal de alerta & Plano B & Frente \\
+\midrule
+\endhead
+\midrule
+\multicolumn{4}{r}{\footnotesize continua na próxima página}\\
+\endfoot
+\bottomrule
+\endlastfoot
+Serviço de impressão atrasa & prazo escorrega em D1 & dividir os lotes; mudar o lote~1
+  para um serviço local; PLA nas peças não críticas & A \\
+Serviço sem TPU & resposta da cotação & almofadas de EVA ou borracha de 3~mm
+  (37,8 $\times$ 16~mm) coladas & A \\
+Peça impressa com defeito & inspeção T3.4 & roda rachada: reimprimir, nunca usar; furos e
+  assentos: lima, broca, morsa & A, B \\
+Black Pill não chega ou chega errada & rastreio; chip F401 ou cristal de 8~MHz & segunda
+  placa de outro vendedor. Clone com cristal de 8~MHz: \cmd{PLLM = 8} em
+  \arq{firmware/src/board.c} e \cmd{-DHSE_VALUE=8000000U} em \arq{firmware/platformio.ini}
+  (o resto do relógio continua igual) & A, D \\
+ST-Link não grava & erro na gravação & conferir SWDIO e SWCLK; segurar NRST; DFU pelo USB-C
+  com o buck desligado & D \\
+IBT-2 não responde com VCC de 3,3~V & motor parado com PWM presente & VCC do IBT-2 em 5~V;
+  conferir RPWM e LPWM no analisador & C \\
+Ruído no I2C & \cmd{erros_i2c} sobe com o motor & capacitores no motor, fios trançados e
+  afastados, I2C curto; o firmware recupera o barramento sozinho & C, D \\
+Encoder fora de quadratura & 40 ou 80 contagens por volta & deslizar um sensor nos rasgos
+  (décimos de milímetro) & D \\
+Fonte desarma ou falha~5 na frenagem & falha~5 ao frear & fonte chaveada de 10~A ou mais
+  (nunca ATX); TVS e capacitores perto do IBT-2 & C \\
+Botão NF DC $\geq$ 10~A não encontrado & --- & chave geral de bateria automotiva (feita para
+  corrente DC alta) no mesmo ponto do circuito & A, C \\
+Multímetro queimado & --- & nunca medir a corrente de partida do motor em série; usar a
+  identificação da T7.3 & E \\
+Rolamento justo ou folgado & inspeção T3.4 & prensar na morsa; gota de cola no anel
+  externo & B \\
+Pêndulo cai sempre para o mesmo lado & etapa~7 & \cmd{trim} com o valor que estabiliza;
+  depois corrigir a montagem do MPU6050 & E \\
+Integrante indisponível & sincronização & C e D se cobrem na eletrônica; A cobre B na
+  montagem & todas \\
+\end{xltabular}
+}
+
+% =====================================================================
+\appendix
+
+\section{Folha de comandos}
+\label{ap:comandos}
+
+\textbf{Ambiente} (na raiz do projeto, uma vez por terminal):
+\begin{comandos}
+\begin{verbatim}
+source .venv/bin/activate
+\end{verbatim}
+\end{comandos}
+
+\textbf{Regenerar tudo} depois de qualquer mudança em \arq{sim/params.py} (sem o
+\cmd{pio run -t upload} quando a placa não estiver ligada):
+\begin{comandos}
+\begin{verbatim}
+python -m sim.export_gains        # lqr_gains.h, vetores de teste e dimensoes_geradas.scad
+python -m sim.export_relatorio    # relatorio/valores.tex (senão um teste falha)
+pytest sim/tests                  # 34 testes
+cd firmware && pio test -e native && pio run -t upload && cd ..
+\end{verbatim}
+\end{comandos}
+
+\textbf{CAD:} \cmd{python cad/folgas.py} (folgas) e \cmd{./cad/build.sh} (STLs, prévias,
+gabarito e massas).
+
+\textbf{Gravação}, dentro de \arq{firmware/}: \cmd{pio run -t upload} (ST-Link) ou
+\cmd{pio run -e blackpill_dfu -t upload} (DFU pelo USB-C, só com o buck desligado).
+
+\textbf{Telemetria, gráficos e identificação:}
+\begin{comandos}
+\begin{verbatim}
+python tools/telemetry_log.py --porta /dev/ttyUSB0 [--saida logs/NOME.csv]
+python tools/plot_log.py logs/NOME.csv [--inicio 2 --fim 8]
+python tools/identify.py motor logs/NOME.csv --R <ohm>
+python tools/identify.py pendulo logs/NOME.csv
+python -m sim.lqr_design          # gráficos do modelo em sim/out/
+\end{verbatim}
+\end{comandos}
+
+\begin{table}[H]
+\centering\small
+\caption{Comandos do firmware (digitados no terminal do \protect\arq{telemetry_log.py}).}
+\label{tab:cmdfw}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.3cm}X@{}}
+\toprule
+Comando & Efeito \\
+\midrule
+\cmd{a} & armar (igual ao botão KEY): calibra o giroscópio e espera a vertical \\
+\cmd{s} & parar; também sai de uma falha \\
+\cmd{m <pct>} & ensaio em malha aberta, de $-45$ a 45\,\%; desliga sozinho 15~s depois do
+  primeiro \cmd{m} \\
+\cmd{k1}, \cmd{k2}, \cmd{k3 <v>} & muda um ganho (perde-se ao desligar) \\
+\cmd{imax <A>} & limite de corrente, de 0,5 a 20~A \\
+\cmd{trim <graus>} & ângulo de equilíbrio, até $\pm$5° \\
+\cmd{trimg <v>} & ganho do auto-ajuste do ângulo (0 desliga) \\
+\cmd{rate <n>} & telemetria a cada $n$~ms (0 desliga) \\
+\cmd{inv motor|enc|giro|ang} & inverte um sinal; só com o controle parado \\
+\cmd{sinais} & confere o sinal do giroscópio (balance o braço por 3~s) \\
+\cmd{cfg}, \cmd{diag}, \cmd{?} & configuração, diagnóstico dos sensores, lista de comandos \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Colunas do log CSV: \cmd{t_s}, \cmd{estado}, \cmd{falha}, \cmd{theta_graus},
+\cmd{vel_graus_s}, \cmd{roda_rpm}, \cmd{u_V}, \cmd{vbus_V}, \cmd{trim_graus},
+\cmd{encoder}.
+
+% ---------------------------------------------------------------------
+\section{Pinagem e alimentação}
+\label{ap:pinagem}
+
+A referência é \arq{firmware/include/board.h}; a tabela abaixo é a mesma de
+\arq{docs/ligacoes.md}, que os testes conferem contra o firmware.
+
+\begin{table}[H]
+\centering\small
+\caption{Pinagem da Black Pill.}
+\label{tab:pinagem}
+\begin{tabularx}{\textwidth}{@{}l>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Pino & Função & Liga em / observação \\
+\midrule
+PB0 & IBT-2 RPWM & TIM3\_CH3, PWM de 20~kHz \\
+PB1 & IBT-2 LPWM & TIM3\_CH4, PWM de 20~kHz \\
+PB10 & IBT-2 R\_EN e L\_EN (juntos) & resistor de \qty{10}{\kilo\ohm} até o GND \\
+PA15 & sensor óptico A (D0) & TIM2\_CH1, modo encoder \\
+PB3 & sensor óptico B (D0) & TIM2\_CH2, modo encoder \\
+PB6 & MPU6050 SCL & I2C1, 400~kHz \\
+PB7 & MPU6050 SDA & I2C1 \\
+PA2 & telemetria TX & RX do adaptador USB-serial; USART2, 460800~baud \\
+PA3 & telemetria RX & TX do adaptador USB-serial \\
+PA4 & tensão do barramento & meio do divisor \qty{10}{\kilo\ohm}/\qty{2,2}{\kilo\ohm};
+  ADC1\_IN4 \\
+PA5, PA6 & IBT-2 R\_IS e L\_IS (opcional) & divisor \qty{10}{\kilo\ohm}/\qty{10}{\kilo\ohm};
+  só com \cmd{USE_CURRENT_SENSE 1} \\
+PA0 & botão KEY da placa & armar e parar \\
+PC13 & LED da placa & ver o apêndice~\ref{ap:led} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Reservados (não use): PA13 e PA14 (SWD do ST-Link), PA11 e PA12 (USB), PB2 (BOOT1).
+
+\begin{table}[H]
+\centering\small
+\caption{Alimentação dos módulos.}
+\label{tab:modulos}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.2cm}ll>{\raggedright\arraybackslash}X@{}}
+\toprule
+Módulo & VCC & GND & Observação \\
+\midrule
+IBT-2 (conector de 8 pinos) & 3V3 & GND & entradas aceitam 3,3~V; se não responder,
+  VCC em 5~V \\
+MPU6050 (GY-521) & 3V3 & GND & AD0 em GND ou solto (endereço 0x68); INT sem ligar \\
+Sensores ópticos (2) & 3V3 & GND & usar a saída D0; A0 sem ligar \\
+Adaptador USB-serial & \textbf{não ligar} & GND & só GND, TX e RX; adaptador de 3,3~V \\
+ST-Link V2 & 3V3 só sem o buck & GND & SWDIO \flecha{} DIO, SWCLK \flecha{} CLK \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------------
+\section{Parâmetros a medir}
+\label{ap:parametros}
+
+Anote aqui cada valor medido. Os de \arq{sim/params.py} exigem a regeneração completa
+(apêndice~\ref{ap:comandos}); os de \arq{cad/params.scad} estão na tabela~\ref{tab:medidas}.
+
+{\small
+\needspace{8\baselineskip}
+\noindent\begin{minipage}{\linewidth}\captionof{table}{Parâmetros medidos na bancada.}\label{tab:parametros}\end{minipage}
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{2.3cm}p{1.9cm}l@{}}
+\toprule
+Parâmetro & Como medir & Valor atual & Medido & Tarefa \\
+\midrule
+\endfirsthead
+\toprule
+Parâmetro & Como medir & Valor atual & Medido & Tarefa \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\multicolumn{5}{@{}l}{\textbf{\protect\arq{sim/params.py}}} \\
+\cmd{Motor.R} & multímetro: menor de 4 posições menos as pontas & \qty{0,80}{\ohm} &
+  \linha[1.6cm] & T4.2 \\
+\cmd{Motor.massa} & balança, sem fios & 0,350~kg & \linha[1.6cm] & T4.2 \\
+\cmd{Motor.n0_rpm} & \cmd{identify.py motor} & 4000~rpm & \linha[1.6cm] & T7.3 \\
+\cmd{Motor.i0} & \cmd{identify.py motor} & 0,60~A & \linha[1.6cm] & T7.3 \\
+\cmd{Roda.m_conjunto} & balança: média dos 12 conjuntos M8 & 0,024~kg & \linha[1.6cm] &
+  T5.14 \\
+\cmd{Roda.preenchimento} & $0{,}85 \times m_\text{roda impressa} / 81{,}8$~g & 0,85 &
+  \linha[1.6cm] & T6.7 \\
+\cmd{Roda.m_flange} & balança, com os parafusos de trava & 0,015~kg & \linha[1.6cm] &
+  T4.2 \\
+\cmd{m_braco} & balança: braço, rolamentos, insertos e parafusos & 0,090~kg &
+  \linha[1.6cm] & T6.7 \\
+\cmd{m_extras} & balança: suporte, sensores, MPU6050, espaçadores & 0,030~kg &
+  \linha[1.6cm] & T6.7 \\
+\cmd{b_p} & \cmd{identify.py pendulo} & \num{5.0e-4}~N$\cdot$m$\cdot$s/rad & \linha[1.6cm]
+  & T7.4 \\
+\midrule
+\multicolumn{5}{@{}l}{\textbf{\protect\arq{firmware/include/board.h}}} \\
+\cmd{VBUS_DIVIDER} & comparação do \cmd{vbus} com o multímetro & 5,545 & \linha[1.6cm] &
+  T5.12 \\
+\cmd{IMU_*_AXIS} & eixo que mostra +1~g com o braço em pé & 2, 1, 0 & \linha[1.6cm] &
+  T7.1 \\
+\cmd{IMU_GYRO_SIGN} & \cmd{sinais}; conferência de sentido & +1 & \linha[1.6cm] &
+  T7.1, T7.5 \\
+\cmd{IMU_ANGLE_SIGN} & conferência de sentido & +1 & \linha[1.6cm] & T7.5 \\
+\cmd{ENC_SIGN} & \cmd{roda_rpm} positivo com \cmd{m 20} & +1 & \linha[1.6cm] & T7.3 \\
+\cmd{MOTOR_SIGN} & só se o motor estiver ligado invertido & +1 & \linha[1.6cm] & T7.3 \\
+\end{xltabular}
+}
+
+% ---------------------------------------------------------------------
+\section{LED e estados do firmware}
+\label{ap:led}
+
+\begin{table}[H]
+\centering\small
+\caption{O que o LED da placa (PC13) indica.}
+\label{tab:led}
+\begin{tabular}{@{}ll@{}}
+\toprule
+LED & Estado \\
+\midrule
+uma piscada curta por segundo & PARADO \\
+piscando rápido & CALIBRA (deixe o pêndulo parado) \\
+piscando médio & ARMADO (leve o braço até a vertical) \\
+aceso & EQUILIBRA \\
+piscando a 5~Hz & MANUAL (ensaio do motor) \\
+$N$ piscadas a cada 3~s & FALHA número $N$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Falhas: 1, inclinação acima de 20°; 2, roda acima de 2000~rpm; 3, MPU6050 sem resposta;
+4, sem tensão (botão de emergência, fusível ou fonte); 5, sobretensão (energia da
+frenagem); 6, motor travado (corrente no limite por 1~s). Em qualquer falha a roda é
+freada e \cmd{s} (ou o botão KEY) volta a PARADO.
+
+% ---------------------------------------------------------------------
+\section{Ajuste fino da etapa 7}
+\label{ap:sintomas}
+
+\begin{table}[H]
+\centering\small
+\caption{Sintomas no primeiro equilíbrio, causa provável e o que fazer.}
+\label{tab:sintomas}
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Sintoma & Causa provável & O que fazer \\
+\midrule
+empurra o braço para o chão na hora & sentido do ângulo invertido & conferência de sentido
+  da T7.5 \\
+vibra rápido, com zumbido & ganho de velocidade alto para o ruído do giroscópio &
+  \cmd{k2} com 20\,\% menos módulo \\
+oscila devagar e cada vez mais & ganho de ângulo baixo & \cmd{k1} com 20\,\% mais módulo \\
+equilibra, mas a roda acelera até cortar (falha~2) & ângulo de equilíbrio errado & espere o
+  auto-ajuste (cerca de 10~s); se não bastar, \cmd{trim} com o valor que estabiliza \\
+cai sempre para o mesmo lado & MPU6050 torto & \cmd{trim <graus>}; depois corrija a
+  montagem \\
+falha~3 durante o equilíbrio & ruído no I2C & T5.13, item~4 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ---------------------------------------------------------------------
+\section{Registro dos marcos}
+\label{ap:registro}
+
+\begin{table}[H]
+\centering\small
+\caption{Previsto e realizado.}
+\label{tab:registro}
+\begin{tabularx}{\textwidth}{@{}ll>{\raggedright\arraybackslash}p{3.4cm}X@{}}
+\toprule
+Marco & Previsto & Realizado (dia e hora) & Observações \\
+\midrule
+M0 Arranque & D0 manhã & & \\[6pt]
+M1 STLs no serviço & D0 manhã & & \\[6pt]
+M2 Compras em mãos & D2 manhã & & \\[6pt]
+M3 Eletrônica validada & D2 noite & & \\[6pt]
+M4 Peças impressas em mãos & D3 manhã & & \\[6pt]
+M5 Mecânica montada & D3 tarde & & \\[6pt]
+M6 Primeiro equilíbrio & D4 manhã & & \\[6pt]
+M7 Hardware pronto & D4 tarde & & \\[6pt]
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\end{document}
