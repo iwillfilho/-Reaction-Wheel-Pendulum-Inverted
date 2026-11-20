@@ -13,17 +13,17 @@ conferida contra ela pelos testes (`pytest sim/tests`).
 ## Alimentação
 
 ```
- Fonte 12 V (+) ── fusível 10 A ──┬── botão de emergência (NF) ──┬── IBT-2 B+
-                                  │                              ├── 2× 4700 µF/35 V + 100 nF + TVS SMBJ15A ──┐
-                                  │                              └── divisor 10 k / 2,2 k ── PA4             │
-                                  └── buck IN+  ── buck OUT+ (5,0 V) ── Black Pill 5V                        │
- Fonte 12 V (−) ── ponto de terra (estrela) no B− do IBT-2 ──────────────────────────────────────────────────┘
+ Fonte 12 V (+) ── fusível 10 A ──┬── IBT-2 B+
+                                  │     ├── 2× 4700 µF/35 V + 100 nF + TVS SMBJ15A ────┐
+                                  │     └── divisor 10 k / 2,2 k ── PA4                │
+                                  └── buck IN+  ── buck OUT+ (5,0 V) ── Black Pill 5V  │
+ Fonte 12 V (−) ── ponto de terra (estrela) no B− do IBT-2 ────────────────────────────┘
                                   ├── buck IN− ;  buck OUT− ── Black Pill GND
 ```
 
-- **Botão de emergência** do tipo normalmente fechado (NF), ≥ 10 A DC, no **fio positivo do motor apenas**: a Black Pill continua ligada e o firmware vê a tensão sumir (falha 4, "sem tensão") e para tudo.
+- **Sem botão de emergência**: o motor é parado pelo firmware (botão KEY, comando `s` e as proteções). Se a tensão no B+ cair (fonte fraca ou mau contato), o firmware vê pelo divisor (falha 4, "sem tensão") e para tudo.
 - **Capacitores e TVS** soldados o mais perto possível dos bornes B+ / B− do IBT-2. TVS SMBJ15A: catodo (faixa) no B+. Eletrolíticos: respeite a polaridade.
-- **Divisor da tensão do barramento** (depois do botão de emergência): 10 kΩ de B+ até PA4, 2,2 kΩ de PA4 até GND e um capacitor de 100 nF de PA4 até GND. A 16,5 V o pino fica em 2,97 V, dentro do limite do ADC.
+- **Divisor da tensão do barramento** (no B+ do IBT-2): 10 kΩ de B+ até PA4, 2,2 kΩ de PA4 até GND e um capacitor de 100 nF de PA4 até GND. A 16,5 V o pino fica em 2,97 V, dentro do limite do ADC.
 - **Terra**: todos os retornos de potência se encontram num ponto só, no B− do IBT-2. O fio de GND da lógica (Black Pill ↔ conector do IBT-2) vai junto com os fios de sinal.
 
 ## Motor 775

@@ -378,14 +378,14 @@ static void test_uma_leitura_perdida_do_mpu6050_nao_derruba(void)
     TEST_ASSERT_EQUAL(RWP_BALANCE, out.state);
 }
 
-static void test_emergencia_apertada_durante_o_equilibrio(void)
+static void test_falta_de_tensao_durante_o_equilibrio(void)
 {
     plant_t x = {0};
     rwp_outputs_t out;
     start_balancing(&x);
     for (int k = 0; k < 100; k++) {
         rwp_inputs_t in = sense(&x);
-        in.vbus = 0.3f;                         /* botão de emergência cortou os 12 V */
+        in.vbus = 0.3f;                         /* a fonte caiu ou o B+ soltou */
         rwp_step(&c, &in, &out);
     }
     TEST_ASSERT_EQUAL(RWP_FAULT_VBUS_LOW, out.fault);
@@ -499,7 +499,7 @@ int main(void)
     RUN_TEST(test_botao_para_o_equilibrio);
     RUN_TEST(test_falha_do_mpu6050);
     RUN_TEST(test_uma_leitura_perdida_do_mpu6050_nao_derruba);
-    RUN_TEST(test_emergencia_apertada_durante_o_equilibrio);
+    RUN_TEST(test_falta_de_tensao_durante_o_equilibrio);
     RUN_TEST(test_nao_arma_sem_tensao);
     RUN_TEST(test_sobretensao_desliga_na_hora);
     RUN_TEST(test_motor_travado_desliga);

@@ -55,7 +55,7 @@ typedef enum {
     RWP_FAULT_ANGLE,       /* 1: inclinação além do limite */
     RWP_FAULT_OVERSPEED,   /* 2: roda acima do limite de rotação */
     RWP_FAULT_IMU,         /* 3: MPU6050 parou de responder */
-    RWP_FAULT_VBUS_LOW,    /* 4: sem tensão no barramento (emergência, fusível, fonte) */
+    RWP_FAULT_VBUS_LOW,    /* 4: sem tensão no barramento (fonte fraca, mau contato) */
     RWP_FAULT_VBUS_HIGH,   /* 5: sobretensão (frenagem devolvendo energia) */
     RWP_FAULT_STALL        /* 6: corrente no limite por tempo demais */
 } rwp_fault_t;

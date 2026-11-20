@@ -65,7 +65,7 @@ informa "3000–5000 rpm"); os ganhos finais saem depois da identificação na b
 - Máquina de estados: PARADO → CALIBRA (viés do giroscópio, 1 s parado) → ARMADO →
   EQUILIBRA (assume sozinho quando o braço passa perto da vertical) → FALHA.
 - Proteções: inclinação > 20°, roda > 2000 rpm, MPU6050 sem resposta, falta de tensão
-  (botão de emergência), sobretensão (energia da frenagem), corrente no limite por 1 s,
+  (fonte fraca ou mau contato), sobretensão (energia da frenagem), corrente no limite por 1 s,
   cão de guarda de 100 ms, freio dinâmico ao falhar.
 - Limite de corrente pelo modelo do motor (10 A), auto-ajuste do ângulo de equilíbrio,
   estimador de velocidade da roda que funciona de ~10 a 2000 rpm, recuperação automática

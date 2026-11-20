@@ -17,7 +17,6 @@ analisador lógico de 8 canais · placa adaptadora de bornes para Arduino Nano.
 |---|---|---|
 | Fonte 12 V ≥ 10 A | 1 | chaveada; a ATX pode desarmar na frenagem |
 | Fusível 10 A retardado + porta-fusível | 1 | no positivo, logo depois da fonte |
-| Botão de emergência DC ≥ 10 A, **NF** | 1 | corta só o positivo do motor |
 | TVS SMBJ15A | 1 | |
 | Capacitor eletrolítico 4700 µF / 35 V | 2 | |
 | Capacitor cerâmico 100 nF | **6** | era 1: +3 no motor, +1 no PA4, +1 de reserva |

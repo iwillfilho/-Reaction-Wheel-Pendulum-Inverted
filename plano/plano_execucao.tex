@@ -299,7 +299,7 @@ Frente & Escopo & Responsável \\
 \textbf{B}: mecânica e CAD & medições, \arq{cad/params.scad}, verificador de folgas,
   geração dos STLs, barra do pivô, conjuntos M8, insertos, braço e roda, balanceamento,
   pivô & \linha \\
-\textbf{C}: potência & placa perfurada, fusível, botão de emergência, capacitores e TVS,
+\textbf{C}: potência & placa perfurada, fusível, capacitores e TVS,
   divisor de tensão, buck, capacitores do motor, IBT-2, bandeja & \linha \\
 \textbf{D}: sinal e firmware & Black Pill, ST-Link, adaptador USB-serial, gravação,
   MPU6050, sensores ópticos, analisador lógico, chicote de sinal, etapas~1 a~3 & \linha \\
@@ -325,8 +325,8 @@ Frente & Escopo & Responsável \\
   \item Toda mudança em \arq{sim/params.py} é seguida da regeneração completa
     (apêndice~\ref{ap:comandos}). Toda inversão de sinal feita pela serial (\cmd{inv})
     é fixada em \arq{firmware/include/board.h} no mesmo dia.
-  \item Segurança não é atalho: óculos de proteção sempre que a roda estiver montada e mão no
-    botão de emergência nos primeiros testes com motor.
+  \item Segurança não é atalho: óculos de proteção sempre que a roda estiver montada e terminal
+    pronto para mandar \cmd{s} nos primeiros testes com motor.
 \end{enumerate}
 
 \subsection{Quadro de status e sincronizações}
@@ -449,12 +449,8 @@ bancada. As tarefas indicadas já tratam de cada um.
     normalmente, mas roda com o relógio errado e a serial vira lixo. Compre só a F411CEU6
     com cristal de 25~MHz (T1.1); o plano B está na seção~\ref{sec:riscos}.
   \item \textbf{Fio de 14~AWG.} Os 50~cm de cada cor provavelmente não bastam para
-    fonte \flecha{} fusível \flecha{} botão \flecha{} IBT-2 e para IBT-2 \flecha{} motor. A T4.6 mede o
+    fonte \flecha{} fusível \flecha{} IBT-2 e para IBT-2 \flecha{} motor. A T4.6 mede o
     percurso e a T1.1 já inclui 1~m a mais de cada cor.
-  \item \textbf{Botão de emergência com o motor parado.} Os dois capacitores de
-    \qty{4700}{\micro\farad} descarregam só pelo divisor de tensão ($\tau \approx 2$~min).
-    Se o botão for apertado com o motor parado, o \cmd{vbus} cai devagar e a falha~4 demora;
-    com o motor girando ela aparece na hora (T5.13). Não é defeito.
 \end{enumerate}
 
 % =====================================================================
@@ -687,11 +683,11 @@ D3 manhã (peças) & \textbf{T3.4} inspeção (\flecha{} M4); \textbf{T6.1} inse
 \midrule
 D3 tarde & T6.3 proteção; apoio na T6.6
   & \textbf{T6.6} pivô (\flecha{} M5)
-  & apoio na fiação; botão de emergência à mão
+  & apoio na fiação; terminal pronto para \cmd{s}
   & \textbf{T7.1} etapa~2; \textbf{T7.2} etapa~3
   & \textbf{T7.3} etapa~5 \\
 \midrule
-D4 manhã & segurança (botão de emergência) e anotações
+D4 manhã & segurança (terminal pronto para \cmd{s}) e anotações
   & apoio na T7.4 (base de cabeça para baixo)
   & apoio
   & \textbf{T7.4} e \textbf{T7.5}, com E
@@ -783,8 +779,6 @@ Cabo USB-C de dados & 1 & só para gravação por DFU (plano B) & --- \\
 Fonte chaveada 12~V, 10~A ou mais & 1 & não use fonte ATX: pode desarmar na frenagem & T5.10 \\
 Fusível 10~A retardado e porta-fusível & 1 + 2 & se ainda não comprado; 2 fusíveis de
   reserva & T5.9 \\
-Botão de emergência NF, DC $\geq$ 10~A & 1 & normalmente \textbf{fechado}; corta só o
-  positivo do motor & T5.9 \\
 TVS SMBJ15A & 2 & 1 de reserva; equivalente de furo: P6KE18A & T5.9 \\
 Capacitor eletrolítico \qty{4700}{\micro\farad} / 35~V & 2 & junto aos bornes do IBT-2 &
   T5.9 \\
@@ -845,8 +839,6 @@ Policarbonato 230 $\times$ 230~mm & vidraçaria, loja de acrílico ou de comunic
   peça cortado na medida \\
 Fonte 12~V 10~A & loja de CFTV, iluminação LED ou informática & fonte chaveada tipo
   ``colmeia'' \\
-Botão de emergência NF & loja de material elétrico ou automação & confira a corrente em
-  DC \\
 Capacitores, TVS, resistores, placa perfurada, bornes, buck & loja de componentes
   eletrônicos & TVS equivalente: P6KE18A \\
 Black Pill, ST-Link, adaptador USB-serial & loja de eletrônica ou maker & só F411CEU6 com
@@ -1196,7 +1188,7 @@ identificação da T7.3 dá a corrente em vazio sem esse risco.
     (T5.11).
   \item Identifique o conector de 8 pinos do IBT-2: VCC, GND, R\_EN, L\_EN, RPWM, LPWM,
     R\_IS, L\_IS. Una R\_EN e L\_EN com um jumper (os dois vão juntos no PB10).
-  \item Veja se os 50~cm de cada cor bastam também para fonte \flecha{} fusível \flecha{} botão
+  \item Veja se os 50~cm de cada cor bastam também para fonte \flecha{} fusível
     \flecha{} B+ e para fonte \flecha{} B$-$. Se não bastarem, avise a frente~A (o pedido da T1.1
     já inclui 1~m a mais).
 \end{passos}
@@ -1376,9 +1368,9 @@ com \cmd{cristal 25 MHz}.
     fonttitle=\sffamily\bfseries\small, colbacktitle=black!60, coltitle=white,
     fontupper=\footnotesize]
 \begin{verbatim}
-Fonte 12 V (+) -- fusível 10 A --+-- botão de emergência (NF) --+-- IBT-2 B+
-                                 |                              +-- 2x 4700 uF + 100 nF + TVS
-                                 |                              +-- 10 k -- PA4 -- 2,2 k -- GND
+Fonte 12 V (+) -- fusível 10 A --+-- IBT-2 B+
+                                 |     +-- 2x 4700 uF + 100 nF + TVS
+                                 |     +-- 10 k -- PA4 -- 2,2 k -- GND
                                  +-- buck IN+ ... buck OUT+ (5,0 V) -- Black Pill 5V
 Fonte 12 V (-) -- ponto de terra em estrela no B- do IBT-2
                   (buck IN-, buck OUT- e o GND da lógica saem daqui)
@@ -1391,7 +1383,7 @@ Fonte 12 V (-) -- ponto de terra em estrela no B- do IBT-2
     placa perfurada e solde com a Black Pill encaixada (fica alinhado). Depois retire a
     placa.
   \item Solde os conectores conforme o desenho da T4.5.
-  \item Divisor do barramento: \qty{10}{\kilo\ohm} do borne ``B+ depois do botão'' até o
+  \item Divisor do barramento: \qty{10}{\kilo\ohm} do borne ``B+'' até o
     PA4; \qty{2,2}{\kilo\ohm} do PA4 ao GND; \qty{100}{\nano\farad} do PA4 ao GND, junto ao
     pino. A 16,5~V o pino fica em 2,97~V, dentro do limite do ADC.
   \item Pull-down: \qty{10}{\kilo\ohm} do PB10 ao GND (a ponte fica desligada enquanto a placa
@@ -1409,8 +1401,7 @@ apêndice~\ref{ap:pinagem} por uma segunda pessoa.
 \begin{tarefa}{T5.9}{Potência e proteções}{C}{1 h}{T4.6 e T5.1}
 \begin{passos}
   \item Porta-fusível logo na saída do positivo da fonte, com fio de 14~AWG.
-  \item Botão de emergência NF em série \textbf{só} no ramo do IBT-2. O buck é ligado antes
-    do botão: a placa continua viva e o firmware vê a tensão do motor sumir.
+  \item Do fusível saem dois ramos: um direto ao B+ do IBT-2 e outro à entrada do buck.
   \item Junto aos bornes B+ e B$-$ do IBT-2: os 2 eletrolíticos de \qty{4700}{\micro\farad}
     (lado marcado com $-$ no B$-$), o \qty{100}{\nano\farad} e a TVS SMBJ15A com o
     \textbf{catodo (faixa) no B+}. Fica mais fácil num pedaço de placa perfurada com 2
@@ -1427,8 +1418,6 @@ apêndice~\ref{ap:pinagem} por uma segunda pessoa.
   \item Antes de ligar: multímetro em continuidade. Sem curto entre 12~V e GND, 5~V e GND,
     3V3 e GND (nos eletrolíticos a leitura sobe aos poucos: é a carga deles). PB10--GND
     \aprox{} \qty{10}{\kilo\ohm}; PA4--GND \aprox{} \qty{2,2}{\kilo\ohm}.
-  \item Botão de emergência, com a fonte desligada: solto = fechado (o multímetro apita);
-    apertado = aberto.
   \item Desconecte a saída do buck da placa. Ligue a fonte e ajuste o trimpot do buck até
     \textbf{5,00~V} na saída, sem carga.
   \item Desligue, reconecte o buck na placa (sem a Black Pill no soquete) e ligue de novo.
@@ -1437,7 +1426,7 @@ apêndice~\ref{ap:pinagem} por uma segunda pessoa.
   \item Desligue a fonte. Os capacitores do barramento continuam carregados por alguns
     minutos (só descarregam pelo divisor): não encoste ferramentas nos bornes do IBT-2.
 \end{passos}
-\textbf{Aceite:} 5,0~V, 12~V e 2,16~V medidos; o botão abre e fecha.
+\textbf{Aceite:} 5,0~V, 12~V e 2,16~V medidos.
 \end{tarefa}
 
 \begin{tarefa}{T5.11}{Capacitores e chicote do motor}{C}{30 min}{T4.6 e T5.1}
@@ -1470,8 +1459,8 @@ apêndice~\ref{ap:pinagem} por uma segunda pessoa.
 \end{tarefa}
 
 \begin{tarefa}{T5.13}{Etapa 4 adaptada: motor na morsa, sem roda}{C, D e E}{45 min}{T4.4, T5.11 e T5.12}
-\textbf{Segurança:} motor bem preso, só com o flange (sem a roda), óculos e mão no botão de
-emergência.
+\textbf{Segurança:} motor bem preso, só com o flange (sem a roda), óculos e terminal pronto
+para mandar \cmd{s}.
 \begin{passos}
   \item Prenda o motor na morsa (pano na carcaça), com o eixo livre e o flange montado.
   \item Encoste os fios do MPU6050 nos fios do motor, como eles vão ficar no braço: o teste
@@ -1479,13 +1468,10 @@ emergência.
   \item \cmd{m 10}: o motor gira devagar. \cmd{s} para. \cmd{m -10}: gira ao contrário.
     \cmd{s}.
   \item \cmd{m 30} por 5~s e depois \cmd{diag}: \cmd{erros_i2c} não pode subir.
-  \item Com o motor girando (\cmd{m 20}), aperte o botão de emergência: o firmware acusa
-    ``sem tensao'' (falha~4; o LED dá 4 piscadas a cada 3~s). Solte o botão; \cmd{s} volta a
-    PARADO.
   \item O ensaio em malha aberta desliga sozinho 15~s depois do primeiro \cmd{m}: é normal.
 \end{passos}
-\textbf{Aceite:} o motor gira nos dois sentidos, \cmd{erros_i2c=0} e o botão provoca a
-falha~4 (\flecha{} M3).
+\textbf{Aceite:} o motor gira nos dois sentidos, \cmd{erros_i2c=0}
+(\flecha{} M3).
 
 \textbf{Se falhar:}
 \begin{itemize}
@@ -1494,8 +1480,8 @@ falha~4 (\flecha{} M3).
     chegam;
   \item \cmd{erros_i2c} sobe \flecha{} capacitores no motor, fios do motor trançados e afastados
     do I2C, fios do I2C mais curtos;
-  \item falha~4 sem apertar o botão \flecha{} fonte fraca (cai abaixo de 9~V na partida) ou mau
-    contato no fusível ou no botão.
+  \item falha~4 \flecha{} fonte fraca (cai abaixo de 9~V na partida) ou mau contato no
+    fusível ou no B+.
 \end{itemize}
 \end{tarefa}
 
@@ -1607,10 +1593,9 @@ Os passos 1, 2 e 4 podem começar enquanto a frente~B monta a roda.
     (M3 com porca; espaçadores se precisar).
   \item Faça a fiação de potência e de sinal conforme o apêndice~\ref{ap:pinagem}, com os
     fios passando por baixo da bandeja.
-  \item Deixe a fonte, o fusível e o botão de emergência fora da base, ao alcance da mão de
-    quem opera o PC.
+  \item Deixe a fonte e o fusível fora da base, ao alcance da mão de quem opera o PC.
 \end{passos}
-\textbf{Aceite:} nada solto e o botão de emergência alcançável.
+\textbf{Aceite:} nada solto.
 \end{tarefa}
 
 \begin{tarefa}[critica]{T6.6}{Pivô: unir o braço e a base}{B e A}{30 min}{T6.2, T6.3 e T4.3}
@@ -1652,7 +1637,7 @@ Os passos 1, 2 e 4 podem começar enquanto a frente~B monta a roda.
 
 \begin{atencao}[Segurança em todos os testes com a roda]
 Óculos de proteção sempre; proteção de policarbonato no lugar; ninguém no plano da roda;
-mão no botão de emergência nos primeiros testes com motor. Grave log de tudo: os logs viram
+terminal pronto para mandar \cmd{s} nos primeiros testes com motor. Grave log de tudo: os logs viram
 os gráficos do relatório.
 \end{atencao}
 
@@ -1741,7 +1726,7 @@ patamares'' \flecha{} patamares curtos demais (menos de 1,5~s): repita.
 \end{tarefa}
 
 \begin{tarefa}[critica]{T7.5}{Etapa 7: conferência de sentido e primeiro equilíbrio}{E e D}{1 a 3 h}{T7.4}
-Base de volta na posição normal e presa na mesa; proteção no lugar; óculos; mão no botão.
+Base de volta na posição normal e presa na mesa; proteção no lugar; óculos; terminal pronto para \cmd{s}.
 
 \textbf{Conferência de sentido (obrigatória antes de equilibrar):}
 \begin{passos}
@@ -1805,7 +1790,7 @@ Base de volta na posição normal e presa na mesa; proteção no lugar; óculos;
   \item Ângulo: de $\pm$22° a $\pm$25° nos batentes.
   \item Equilíbrio de 30~s sem tocar, sem a roda disparar (sem falha~2).
   \item Recuperação: solto de 10°, o braço volta à vertical.
-  \item Botão de emergência com o pêndulo equilibrando: falha~4 e a roda para.
+  \item \cmd{s} com o pêndulo equilibrando: a ponte desliga e o estado volta a PARADO.
   \item Braço empurrado além de 20°: falha~1 (inclinação) com freio dinâmico.
   \item SDA do MPU6050 desconectado com o pêndulo ARMADO (motor parado): falha~3.
     Reconecte; \cmd{s} volta a PARADO.
@@ -2095,7 +2080,7 @@ $N$ piscadas a cada 3~s & FALHA número $N$ \\
 \end{table}
 
 Falhas: 1, inclinação acima de 20°; 2, roda acima de 2000~rpm; 3, MPU6050 sem resposta;
-4, sem tensão (botão de emergência, fusível ou fonte); 5, sobretensão (energia da
+4, sem tensão (fonte fraca ou mau contato); 5, sobretensão (energia da
 frenagem); 6, motor travado (corrente no limite por 1~s). Em qualquer falha a roda é
 freada e \cmd{s} (ou o botão KEY) volta a PARADO.
 

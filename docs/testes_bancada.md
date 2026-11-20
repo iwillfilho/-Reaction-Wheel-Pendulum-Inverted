@@ -5,7 +5,8 @@ problema aparece quando ainda é barato de achar. Guarde todos os logs: eles
 viram os gráficos do relatório.
 
 **Segurança**: óculos de proteção sempre que a roda estiver montada. Proteção de
-policarbonato no lugar. Mão no botão de emergência nos primeiros testes com motor.
+policarbonato no lugar. Nos primeiros testes com motor, deixe o terminal pronto para mandar `s`
+ou o dedo no botão KEY da placa.
 
 ## Comandos que você vai usar
 
@@ -57,15 +58,13 @@ Ligue o MPU6050 (3V3, GND, PB6, PB7) e monte-o no braço.
 
 ## Etapa 4: motor sem roda, PWM baixo
 
-Retire a roda (fica só o flange). Ligue os 12 V **com a mão no botão de emergência**.
+Retire a roda (fica só o flange). Ligue os 12 V com o terminal pronto para mandar `s`.
 
 1. `diag`: `vbus` perto de 12 V. Se der 0, confira o divisor em PA4.
 2. `m 10`: o motor gira devagar. `s` para. `m -10`: gira ao contrário.
 3. `m 30` por alguns segundos e `diag`: **`erros_i2c` não pode subir**. Se subir, o ruído
    do motor está chegando no I2C: capacitores no motor, fios do motor trançados e longe
    dos fios do MPU6050.
-4. Aperte o botão de emergência com o motor girando: o firmware deve acusar
-   "sem tensão" (LED com 4 piscadas). `s` volta a PARADO.
 
 ## Etapa 5: identificação do motor
 

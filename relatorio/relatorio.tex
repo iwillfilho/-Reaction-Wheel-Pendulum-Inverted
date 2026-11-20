@@ -108,7 +108,7 @@ a malha de controle a \qty{\vFs}{\hertz} e comanda a ponte H BTS7960 por PWM de
   \node[bloco, right=14mm of bp] (ibt) {Ponte H\\BTS7960 (IBT-2)};
   \node[bloco, right=12mm of ibt] (mot) {Motor 775\\+ roda de reação};
   \node[bloco, below=12mm of mot, fill=orange!8] (pend) {Pêndulo\\$\theta$, $\dot\theta$, $\omega$};
-  \node[bloco, above=9mm of ibt] (fonte) {Fonte \qty{\vVbus}{\volt}\\fusível + emergência};
+  \node[bloco, above=9mm of ibt] (fonte) {Fonte \qty{\vVbus}{\volt}\\+ fusível};
   \node[bloco, below=10mm of bp] (ser) {Adaptador USB-serial\\telemetria e comandos};
   \draw[seta] (mpu) -- node[rot]{I2C \qty{400}{\kilo\hertz}} (bp);
   \draw[seta] (enc) -- node[rot]{TIM2 quadratura} (bp);
@@ -672,7 +672,7 @@ MPU6050 (GY-521) & ângulo e velocidade angular do braço, por I2C \\
 Ponte H BTS7960 (IBT-2) & aciona o motor nos dois sentidos, até \qty{43}{\ampere} \\
 Motor CC 775, \qty{12}{\volt} & atuador; \qty{\vMotorNzero}{\rpm} em vazio (estimado) \\
 Fonte \qty{12}{\volt}, \qty{10}{\ampere} + conversor buck \qty{5}{\volt} & potência do motor e da lógica \\
-Fusível \qty{10}{\ampere}, botão de emergência, TVS e capacitores & proteção do barramento \\
+Fusível \qty{10}{\ampere}, TVS e capacitores & proteção do barramento \\
 ST-Link V2 e adaptador USB-serial \qty{3,3}{\volt} & gravação, depuração e telemetria \\
 Rolamentos 608-ZZ, barra de aço \qty{8}{\milli\metre}, colares SCC8 & pivô \\
 \bottomrule
@@ -689,24 +689,22 @@ Rolamentos 608-ZZ, barra de aço \qty{8}{\milli\metre}, colares SCC8 & pivô \\
   node distance=6mm and 9mm]
   \node[bloco] (f) {Fonte\\\qty{12}{\volt}};
   \node[bloco, right=of f] (fu) {Fusível\\\qty{10}{\ampere}};
-  \node[bloco, right=of fu] (em) {Emergência\\(NF)};
-  \node[bloco, right=of em] (ibt) {IBT-2\\B+ / B$-$};
+  \node[bloco, right=of fu] (ibt) {IBT-2\\B+ / B$-$};
   \node[bloco, right=of ibt] (m) {Motor\\775};
-  \node[bloco, below=of em] (bk) {Buck\\\qty{5,0}{\volt}};
+  \node[bloco, below=of fu, xshift=14mm] (bk) {Buck\\\qty{5,0}{\volt}};
   \node[bloco, right=of bk, fill=blue!6] (bp) {Black Pill\\pino 5V};
   \node[bloco, above=of ibt, xshift=5mm, font=\scriptsize] (cap) {2×\qty{4700}{\micro\farad} + \qty{100}{\nano\farad}\\+ TVS SMBJ15A};
-  \node[bloco, above=of em, xshift=-14mm, font=\scriptsize] (div) {divisor \qty{10}{\kilo\ohm} / \qty{2,2}{\kilo\ohm}\\$\to$ PA4 (tensão)};
+  \node[bloco, above=of fu, xshift=-10mm, font=\scriptsize] (div) {divisor \qty{10}{\kilo\ohm} / \qty{2,2}{\kilo\ohm}\\$\to$ PA4 (tensão)};
   \draw[seta] (f) -- (fu);
-  \draw[seta] (fu) -- (em);
-  \draw[seta] (em) -- (ibt);
+  \draw[seta] (fu) -- (ibt);
   \draw[seta] (ibt) -- (m);
   \draw[seta] (fu.south) |- (bk.west);
   \draw[seta] (bk) -- (bp);
   \draw[thick] (cap.south) -- (cap.south |- ibt.north);
-  \draw[seta] ($(em.east)!0.5!(ibt.west)$) |- (div.east);
+  \draw[seta] ($(fu.east)!0.5!(ibt.west)$) |- (div.east);
 \end{tikzpicture}
-\caption{Distribuição de energia. O botão de emergência corta só o motor: a Black Pill continua
-ligada, percebe a falta de tensão pelo divisor e entra em falha.}
+\caption{Distribuição de energia. O divisor mede a tensão que chega à ponte: se ela cair (fonte
+fraca ou mau contato), o firmware entra em falha.}
 \label{fig:alimentacao}
 \end{figure}
 
