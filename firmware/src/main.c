@@ -56,6 +56,7 @@ static void print_help(void)
                 "#  rate <n>     telemetria a cada n ms (0 desliga)\r\n"
                 "#  inv motor|enc|giro|ang   inverte um sinal\r\n"
                 "#  sinais       confere o sinal do giroscopio (balance o braco por 3 s)\r\n"
+                "#  lei lqr|lqi|pid   lei do equilibrio (fora de EQUILIBRA)\r\n"
                 "#  cfg  diag  ?\r\n");
 }
 
@@ -70,6 +71,7 @@ static void print_cfg(void)
                 tele_fixed3(c, g->theta_cut * 57.29578f), tele_fixed3(d, g->w_max));
     tele_printf("# sinais: motor=%d enc=%d giro=%d ang=%d  telemetria a cada %lu ms\r\n", sign_motor, sign_enc,
                 sign_gyro, sign_angle, (unsigned long)tele_div);
+    tele_printf("# lei do equilibrio: %s\r\n", rwp_law_name(g->law));
 }
 
 static void print_diag(void)
@@ -138,6 +140,16 @@ static void handle_command(char *line)
             toggle(&sign_gyro, "giro");
         } else if (!strcmp(arg, "ang")) {
             toggle(&sign_angle, "ang");
+        }
+        return;
+    } else if (!strcmp(line, "lei") && arg != NULL) {
+        rwp_law_t l = !strcmp(arg, "lqi") ? RWP_LAW_LQI : !strcmp(arg, "pid") ? RWP_LAW_PID : RWP_LAW_LQR;
+        if (strcmp(arg, "lqr") && strcmp(arg, "lqi") && strcmp(arg, "pid")) {
+            tele_printf("# use: lei lqr|lqi|pid\r\n");
+        } else if (!rwp_set_law(&ctl, l)) {
+            tele_printf("# a lei so muda fora de EQUILIBRA (mande s antes)\r\n");
+        } else {
+            tele_printf("# lei do equilibrio: %s\r\n", rwp_law_name(l));
         }
         return;
     } else if (!strcmp(line, "sinais")) {

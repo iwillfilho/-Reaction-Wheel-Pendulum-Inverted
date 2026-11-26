@@ -1,3 +1,8 @@
+/* Telemetria e comandos pela porta serial virtual do USB (CDC), no mesmo cabo
+   USB-C que alimenta a Black Pill. No PC aparece como /dev/ttyACM0 (Linux) ou
+   COMx (Windows). A interface é a mesma de antes (tele_init, tele_printf,
+   tele_get_line): o resto do firmware não muda, e o controle nunca espera
+   pela serial. */
 #include "telemetry.h"
 
 #include <stdarg.h>
@@ -5,27 +10,37 @@
 #include <string.h>
 
 #include "board.h"
+#include "usbd_cdc.h"
+#include "usbd_core.h"
+#include "usbd_desc.h"
 
 #define TX_SIZE 2048u            /* potência de 2 */
 #define TX_MASK (TX_SIZE - 1u)
+#define TX_CHUNK 512u            /* maior bloco entregue ao USB de uma vez */
 #define RX_LINE 48u
 
+static USBD_HandleTypeDef usb_dev;
+static bool usb_ok;
+
 static uint8_t tx_buf[TX_SIZE];
-static volatile uint32_t tx_head;   /* próxima posição livre */
-static volatile uint32_t tx_tail;   /* próximo byte a enviar */
+static volatile uint32_t tx_head;      /* próxima posição livre */
+static volatile uint32_t tx_tail;      /* próximo byte a enviar */
 static volatile uint32_t tx_sending;   /* bytes do bloco em transmissão (0 = parado) */
 
-static uint8_t rx_byte;
+static uint8_t rx_pkt[CDC_DATA_FS_MAX_PACKET_SIZE];
 static char rx_line[RX_LINE];
 static volatile uint32_t rx_len;
 static char rx_ready[RX_LINE];
 static volatile bool rx_has_line;
 
+/* 460800 8N1: só para o terminal do PC ficar contente; no USB não importa. */
+static uint8_t line_coding[7] = {0x00, 0x08, 0x07, 0x00, 0x00, 0x00, 0x08};
+
 /* Dispara o envio do próximo trecho contíguo da fila. Chamar com interrupções
-   mascaradas ou de dentro da interrupção da serial. */
+   mascaradas ou de dentro da interrupção do USB. */
 static void tx_kick(void)
 {
-    if (tx_sending != 0u || tx_head == tx_tail) {
+    if (!usb_ok || tx_sending != 0u || tx_head == tx_tail || usb_dev.dev_state != USBD_STATE_CONFIGURED) {
         return;
     }
     uint32_t tail = tx_tail & TX_MASK;
@@ -33,18 +48,90 @@ static void tx_kick(void)
     if (n > TX_SIZE - tail) {
         n = TX_SIZE - tail;          /* até o fim do vetor; o resto vai no próximo bloco */
     }
+    if (n > TX_CHUNK) {
+        n = TX_CHUNK;
+    }
     tx_sending = n;
-    if (HAL_UART_Transmit_IT(&huart2, &tx_buf[tail], (uint16_t)n) != HAL_OK) {
-        tx_sending = 0;
+    (void)USBD_CDC_SetTxBuffer(&usb_dev, &tx_buf[tail], n);
+    if (USBD_CDC_TransmitPacket(&usb_dev) != (uint8_t)USBD_OK) {
+        tx_sending = 0;              /* tenta de novo no próximo tele_printf */
     }
 }
+
+/* ---- funções chamadas pela classe CDC (dentro da interrupção do USB) ---- */
+
+static int8_t cdc_init(void)
+{
+    tx_sending = 0;
+    rx_len = 0;
+    (void)USBD_CDC_SetRxBuffer(&usb_dev, rx_pkt);   /* a classe já arma a primeira recepção */
+    return (int8_t)USBD_OK;
+}
+
+static int8_t cdc_deinit(void)
+{
+    tx_sending = 0;
+    return (int8_t)USBD_OK;
+}
+
+static int8_t cdc_control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
+{
+    if (cmd == CDC_SET_LINE_CODING && length >= sizeof(line_coding)) {
+        memcpy(line_coding, pbuf, sizeof(line_coding));
+    } else if (cmd == CDC_GET_LINE_CODING && length >= sizeof(line_coding)) {
+        memcpy(pbuf, line_coding, sizeof(line_coding));
+    }
+    return (int8_t)USBD_OK;
+}
+
+static int8_t cdc_receive(uint8_t *buf, uint32_t *len)
+{
+    for (uint32_t k = 0; k < *len; k++) {
+        char ch = (char)buf[k];
+        if (ch == '\n' || ch == '\r') {
+            if (rx_len > 0 && !rx_has_line) {
+                rx_line[rx_len] = '\0';
+                memcpy(rx_ready, rx_line, rx_len + 1);
+                rx_has_line = true;
+            }
+            rx_len = 0;
+        } else if (rx_len < RX_LINE - 1u) {
+            rx_line[rx_len++] = ch;
+        }
+    }
+    (void)USBD_CDC_SetRxBuffer(&usb_dev, rx_pkt);
+    (void)USBD_CDC_ReceivePacket(&usb_dev);
+    return (int8_t)USBD_OK;
+}
+
+static int8_t cdc_tx_done(uint8_t *buf, uint32_t *len, uint8_t epnum)
+{
+    (void)buf;
+    (void)len;
+    (void)epnum;
+    tx_tail += tx_sending;
+    tx_sending = 0;
+    tx_kick();
+    return (int8_t)USBD_OK;
+}
+
+static USBD_CDC_ItfTypeDef cdc_fops = {cdc_init, cdc_deinit, cdc_control, cdc_receive, cdc_tx_done};
+
+/* ---- interface usada pelo firmware ---- */
 
 void tele_init(void)
 {
     tx_head = tx_tail = tx_sending = 0;
     rx_len = 0;
     rx_has_line = false;
-    (void)HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+
+    /* O USB precisa dos 48 MHz exatos que só o cristal dá. Com o relógio
+       interno o controle funciona, mas sem telemetria. */
+    usb_ok = board_clock_is_hse() &&
+             USBD_Init(&usb_dev, &Class_Desc, DEVICE_FS) == USBD_OK &&
+             USBD_RegisterClass(&usb_dev, &USBD_CDC) == USBD_OK &&
+             USBD_CDC_RegisterInterface(&usb_dev, &cdc_fops) == (uint8_t)USBD_OK &&
+             USBD_Start(&usb_dev) == USBD_OK;
 }
 
 void tele_printf(const char *fmt, ...)
@@ -92,43 +179,4 @@ bool tele_get_line(char *dst, size_t size)
     rx_has_line = false;
     __enable_irq();
     return true;
-}
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (huart != &huart2) {
-        return;
-    }
-    tx_tail += tx_sending;
-    tx_sending = 0;
-    tx_kick();
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-    if (huart != &huart2) {
-        return;
-    }
-    char ch = (char)rx_byte;
-    if (ch == '\n' || ch == '\r') {
-        if (rx_len > 0 && !rx_has_line) {
-            rx_line[rx_len] = '\0';
-            memcpy(rx_ready, rx_line, rx_len + 1);
-            rx_has_line = true;
-        }
-        rx_len = 0;
-    } else if (rx_len < RX_LINE - 1u) {
-        rx_line[rx_len++] = ch;
-    }
-    (void)HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
-}
-
-/* Erro de recepção (ruído, estouro): limpa e volta a escutar. */
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-    if (huart != &huart2) {
-        return;
-    }
-    rx_len = 0;
-    (void)HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
 }

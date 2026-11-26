@@ -1,5 +1,6 @@
 /* Tratadores de interrupção e de exceção. */
 #include "board.h"
+#include "usbd_conf.h"
 
 void SysTick_Handler(void)
 {
@@ -18,6 +19,12 @@ void TIM1_TRG_COM_TIM11_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
     HAL_UART_IRQHandler(&huart2);
+}
+
+/* USB (porta serial virtual da telemetria). */
+void OTG_FS_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
 }
 
 /* Qualquer exceção grave: desabilita a ponte H direto no registrador e espera

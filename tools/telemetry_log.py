@@ -2,7 +2,7 @@
 """Grava a telemetria do firmware em CSV e permite mandar comandos.
 
 Uso (com a .venv ativa):
-    python tools/telemetry_log.py                      # /dev/ttyUSB0, grava em logs/
+    python tools/telemetry_log.py                      # /dev/ttyACM0 (USB da Black Pill), grava em logs/
     python tools/telemetry_log.py --porta /dev/ttyACM0 --saida ensaio_motor.csv
 
 Digite os comandos do firmware (a, s, m 20, k1 -250, cfg, diag, ?) e Enter.
@@ -49,7 +49,7 @@ def leitor(porta: serial.Serial, arquivo, parar: threading.Event) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--porta", default="/dev/ttyUSB0")
+    ap.add_argument("--porta", default="/dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=460800)
     ap.add_argument("--saida", default=None, help="arquivo CSV (padrão: logs/AAAAMMDD_HHMMSS.csv)")
     a = ap.parse_args()
@@ -59,7 +59,7 @@ def main() -> None:
     try:
         porta = serial.Serial(a.porta, a.baud, timeout=0.2)
     except serial.SerialException as e:
-        sys.exit(f"Não abriu {a.porta}: {e}\nConfira o adaptador USB-serial (ls /dev/ttyUSB* /dev/ttyACM*).")
+        sys.exit(f"Não abriu {a.porta}: {e}\nConfira o cabo USB-C da Black Pill e se o firmware está gravado (ls /dev/ttyACM*; no Windows, COMx no Gerenciador de Dispositivos).")
 
     parar = threading.Event()
     with porta, open(saida, "w", encoding="ascii") as arq:

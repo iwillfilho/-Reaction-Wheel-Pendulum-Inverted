@@ -1,4 +1,4 @@
-/* Serial de telemetria e comandos (USART2), sem bloquear o laço de controle. */
+/* Serial de telemetria e comandos pela porta USB (CDC), sem bloquear o laço de controle. */
 #ifndef TELEMETRY_H
 #define TELEMETRY_H
 

@@ -13,14 +13,15 @@
  *   Sensor óptico B (D0)         PB3    TIM2_CH2, modo encoder
  *   MPU6050 SCL                  PB6    I2C1, 400 kHz
  *   MPU6050 SDA                  PB7    I2C1
- *   Telemetria TX (-> RX do adaptador USB-serial)   PA2   USART2
- *   Telemetria RX (<- TX do adaptador USB-serial)   PA3   USART2
+ *   USB D- (telemetria e comandos, serial virtual)  PA11  USB OTG FS
+ *   USB D+ (telemetria e comandos, serial virtual)  PA12  USB OTG FS
+ *   (PA2/PA3 continuam configurados como USART2, mas ficam sem uso)
  *   Tensão do barramento (divisor 10 k / 2,2 k)     PA4   ADC1_IN4
  *   IBT-2 R_IS (divisor 10 k / 10 k, opcional)      PA5   ADC1_IN5
  *   IBT-2 L_IS (divisor 10 k / 10 k, opcional)      PA6   ADC1_IN6
  *   Botão KEY da placa (armar / parar)              PA0   GPIO, ativo em nível baixo
  *   LED da placa                                    PC13  GPIO, ativo em nível baixo
- *   Reservados: PA13/PA14 (SWD), PA11/PA12 (USB), PB2 (BOOT1)
+ *   Reservados: PA13/PA14 (SWD), PB2 (BOOT1)
  */
 #ifndef BOARD_H
 #define BOARD_H
