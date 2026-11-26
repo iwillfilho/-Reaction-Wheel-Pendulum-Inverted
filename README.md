@@ -9,6 +9,7 @@ Controle a 1 kHz numa WeAct Black Pill STM32F411CEU6, com três leis para o equi
 
 ```
 sim/        modelo físico, dimensionamento, projeto do LQR, testes (Python)
+matlab/     a mesma simulação em MATLAB (modelo, LQR, LQI, PID), conferida contra o Python
 firmware/   PlatformIO + HAL da ST; lib/control é C puro testado no PC
 cad/        peças em OpenSCAD paramétrico + verificador de folgas
 tools/      gravação de telemetria, gráficos e identificação de parâmetros
@@ -30,7 +31,7 @@ source .venv/bin/activate
 python -m sim.sizing          # tamanho da roda x inclinação recuperável
 python -m sim.lqr_design      # ganhos de LQR, LQI e PID, robustez, comparação e gráficos em sim/out/
 python -m sim.export_gains    # depois de mudar sim/params.py
-pytest sim/tests              # 50 testes: física, controle (LQR, LQI e PID), ferramentas, coerência
+pytest sim/tests              # 51 testes: física, controle (LQR, LQI e PID), ferramentas, coerência
 
 cd firmware
 pio test -e native            # 30 testes da lógica de controle, no PC (as três leis contra o Python)
@@ -45,6 +46,15 @@ python -m sim.export_relatorio && (cd relatorio && latexmk -pdf relatorio.tex)  
 ```
 
 Instalação das ferramentas: `pipx install platformio` e `sudo apt install openscad`.
+
+
+### Em MATLAB
+
+A pasta [matlab/](matlab/README.md) tem o mesmo modelo, o projeto das três leis e a malha
+fechada com sensores ideais (precisa do Control System Toolbox). Abra a pasta no MATLAB e
+rode `exemplo_rwp`; `verificar_python` confere os ganhos e as trajetórias contra o Python.
+Depois de mudar `sim/params.py`, atualize `matlab/rwp_params.m` e rode
+`python -m sim.export_matlab` (um teste falha se esquecer).
 
 ## Resultados da simulação (com parâmetros estimados)
 

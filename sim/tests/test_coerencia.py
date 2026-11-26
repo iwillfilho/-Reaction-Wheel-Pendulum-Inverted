@@ -47,3 +47,24 @@ def test_pinagem_da_documentacao_igual_ao_firmware():
     doc = (RAIZ / "docs/ligacoes.md").read_text(encoding="utf-8")
     tabela = dict(re.findall(r"^\|\s*\*\*(P[ABC]\d+)\*\*\s*\|\s*([^|]+?)\s*\|", doc, flags=re.M))
     assert set(tabela) == set(pinos_fw), (set(tabela) ^ set(pinos_fw))
+
+
+def test_matlab_em_dia():
+    """Se falhar: mudaram sim/params.py sem atualizar matlab/rwp_params.m ou sem
+    rodar `python -m sim.export_matlab` (a referência do matlab/verificar_python.m)."""
+    import json
+
+    texto = (RAIZ / "matlab/rwp_params.m").read_text(encoding="utf-8")
+    texto = texto.split("substituições")[0]
+    lidos = dict(re.findall(r"^p\.(\w+)\s*=\s*([-+0-9.eE]+);", texto, flags=re.M))
+    assert len(lidos) == 36  # 9 do motor, 16 da roda, 11 do pêndulo
+    for campo, valor in lidos.items():
+        obj, nome = ((NOMINAL.motor, campo[6:]) if campo.startswith("motor_")
+                     else (NOMINAL.roda, campo[5:]) if campo.startswith("roda_") else (NOMINAL, campo))
+        assert float(valor) == getattr(obj, nome), f"matlab/rwp_params.m: {campo} = {valor}"
+
+    ref = json.loads((RAIZ / "matlab/referencia_python.json").read_text(encoding="utf-8"))
+    g = projetar(NOMINAL)
+    assert ref["ganhos"]["K"] == [g.k1, g.k2, g.k3]
+    assert ref["ganhos"]["KI"] == [g.q1, g.q2, g.q3, g.q4]
+    assert ref["derivados"]["J"] == NOMINAL.J and ref["derivados"]["Mgl"] == NOMINAL.Mgl
