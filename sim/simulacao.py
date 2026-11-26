@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .controlador import Controlador, Ganhos, lei_controle
+from .controlador import Controlador, Ganhos, Integradores, lei_controle
 from .model import Planta
 from .params import Params
 
@@ -86,6 +86,7 @@ def simular(
     x = (theta0, 0.0, 0.0, 0.0) if realista else (theta0, 0.0, 0.0)
     phi = 0.0
     ctrl = Controlador(g, theta0=theta0 + (s.vies_angulo if realista else 0.0))
+    integ = Integradores(0.0)   # LQI e PID com sensores ideais
     fila_imu = deque([(theta0 + s.vies_angulo, 0.0)] * (s.atraso_imu + 1), maxlen=s.atraso_imu + 1)
     fila_u = deque([0.0] * (s.atraso_controle + 1), maxlen=s.atraso_controle + 1)
     dist = sorted(disturbios or [])
@@ -114,8 +115,11 @@ def simular(
             u = fila_u[0]
             th_est, w_est, trim = ctrl.theta, ctrl.w, ctrl.trim
         else:
-            u = lei_controle(x[0], x[1], x[2], p.v_bus, g)
-            th_est, w_est, trim = x[0], x[2], 0.0
+            if g.lei == "lqr":
+                u = lei_controle(x[0], x[1], x[2], p.v_bus, g)
+            else:
+                u = integ.passo(g, x[0], x[1], x[2], phi, p.v_bus)
+            th_est, w_est, trim = x[0], x[2], integ.ref if g.lei != "lqr" else 0.0
 
         if caiu:
             u = 0.0

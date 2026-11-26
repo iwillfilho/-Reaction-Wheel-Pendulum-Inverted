@@ -91,3 +91,66 @@ def test_estimador_decai_quando_a_roda_para(g):
     for _ in range(1500):
         w = c.velocidade_roda(parado)
     assert abs(w) < 0.5
+
+
+# --- LQI e PID ------------------------------------------------------------------
+from sim.controlador import Integradores, com_lei, discretizar_lqi  # noqa: E402
+
+
+def test_polos_do_lqi_dentro_do_circulo_unitario(g):
+    Ad, Bd = discretizar_lqi(NOMINAL)
+    assert np.all(np.abs(np.linalg.eigvals(Ad - Bd @ g.KI)) < 1.0)
+
+
+@pytest.mark.parametrize("lei", ["lqi", "pid"])
+def test_lqi_e_pid_recuperam_de_5_graus(g, lei):
+    r = simular(NOMINAL, com_lei(g, lei), theta0=math.radians(5.0), T=5.0, realista=True)
+    assert not r.caiu
+    assert r.acomodou(tol_theta=math.radians(1.0), tol_thd=0.3)
+    assert np.max(np.abs(r.u)) <= NOMINAL.u_max + 1e-9
+    assert r.omega_pico < NOMINAL.w_max
+
+
+@pytest.mark.parametrize("lei", ["lqi", "pid"])
+def test_lqi_e_pid_rejeitam_peteleco(g, lei):
+    r = simular(NOMINAL, com_lei(g, lei), theta0=0.0, T=5.0, realista=True, disturbios=[(0.5, 2.0)])
+    assert not r.caiu and r.acomodou(tol_theta=math.radians(1.5), tol_thd=0.3)
+
+
+@pytest.mark.parametrize("lei", ["lqi", "pid"])
+@pytest.mark.parametrize("nome", ["resistência +40 %", "motor mais lento (3000 rpm)", "braço +50 % de massa"])
+def test_lqi_e_pid_com_erro_de_parametro(g, lei, nome):
+    r = simular(NOMINAL, com_lei(g, lei), theta0=math.radians(5.0), T=6.0,
+                planta=variar(NOMINAL, VARIACOES[nome]), semente=1)
+    assert not r.caiu and r.acomodou(tol_theta=math.radians(1.5), tol_thd=0.5)
+
+
+def test_lqi_para_a_roda_mais_rapido_que_o_auto_ajuste(g):
+    """Com o MPU6050 2° torto, o LQI zera a roda em segundos; o LQR com auto-ajuste leva dezenas."""
+    s = Sensores(vies_angulo=math.radians(2.0))
+    lqi = simular(NOMINAL, com_lei(g, "lqi"), theta0=0.0, T=12.0, sensores=s, semente=3)
+    lqr = simular(NOMINAL, g, theta0=0.0, T=12.0, sensores=s, semente=3)
+    w = lambda r: abs(np.mean(r.omega[9500:10500]))   # noqa: E731  (em torno de 10 s)
+    assert not lqi.caiu and w(lqi) < 1.0            # < 10 rpm
+    assert w(lqr) > 5.0 * w(lqi)
+    assert lqi.trim[-1] == pytest.approx(math.radians(2.0), abs=math.radians(0.3))
+
+
+def test_pid_sem_a_malha_da_roda_cai_com_o_mpu_torto(g):
+    """Só em theta, o PID não enxerga a roda: com viés ela dispara e o braço cai."""
+    s = Sensores(vies_angulo=math.radians(2.0))
+    so_theta = replace(com_lei(g, "pid"), kw=0.0, kwi=0.0)
+    r = simular(NOMINAL, so_theta, theta0=0.0, T=15.0, sensores=s, semente=3)
+    com = simular(NOMINAL, com_lei(g, "pid"), theta0=0.0, T=15.0, sensores=s, semente=3)
+    assert r.caiu or r.omega_pico > NOMINAL.w_max
+    assert not com.caiu and com.omega_pico < NOMINAL.w_max
+
+
+@pytest.mark.parametrize("lei", ["lqi", "pid"])
+def test_anti_windup_limita_o_integrador_da_roda(g, lei):
+    gl = com_lei(g, lei)
+    it = Integradores(0.0)
+    for k in range(20000):   # roda girando sem parar a 100 rad/s, braço parado
+        u = it.passo(gl, 0.0, 0.0, 100.0, 100.0 * k * gl.ts, NOMINAL.v_bus)
+        assert abs(u) <= gl.u_frac * NOMINAL.v_bus + 1e-12
+    assert abs(it.ref) <= gl.trim_max + 1e-9

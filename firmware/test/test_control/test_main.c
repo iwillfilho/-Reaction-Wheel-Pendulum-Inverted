@@ -480,6 +480,99 @@ static void test_ciclo_nunca_passa_do_limite(void)
     }
 }
 
+/* ------------------------------------------------------------------------- */
+/* LQI e PID                                                                  */
+/* ------------------------------------------------------------------------- */
+static float run_sequence(rwp_law_t law, const float (*vec)[3], const int *count)
+{
+    rwp_outputs_t out;
+    float pior = 0.0f;
+    c.cfg.law = law;
+    rwp_test_force_balance(&c, SEQ_THETA0);
+    for (int k = 0; k < N_SEQ; k++) {
+        rwp_inputs_t in = {0};
+        in.theta_acc = vec[k][0];
+        in.gyro = vec[k][1];
+        in.enc_count = count[k];
+        in.vbus = SEQ_VBUS;
+        in.imu_ok = true;
+        rwp_step(&c, &in, &out);
+        TEST_ASSERT_EQUAL(RWP_BALANCE, out.state);
+        float erro = fabsf(out.u - vec[k][2]);
+        if (erro > pior) {
+            pior = erro;
+        }
+    }
+    return pior;
+}
+
+static void test_sequencia_lqi_igual_ao_python(void)
+{
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.0f, run_sequence(RWP_LAW_LQI, SEQ_LQI_VEC, SEQ_LQI_COUNT));
+}
+
+static void test_sequencia_pid_igual_ao_python(void)
+{
+    TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.0f, run_sequence(RWP_LAW_PID, SEQ_PID_VEC, SEQ_PID_COUNT));
+}
+
+/* Integradores com saturação e roda disparando (anti-windup), contra Python. */
+static void check_integrators(rwp_law_t law, const float (*vec)[7])
+{
+    TEST_ASSERT_TRUE(rwp_set_law(&c, law));
+    for (int k = 0; k < N_INT; k++) {
+        const float *v = vec[k];
+        float u = rwp_balance_law(&c, v[0], v[1], v[2], v[3], v[4]);
+        TEST_ASSERT_FLOAT_WITHIN(2e-2f, v[5], u);
+        TEST_ASSERT_FLOAT_WITHIN(2e-4f, v[6], c.ref);
+        TEST_ASSERT_TRUE(fabsf(c.ref) <= c.cfg.trim_max + 1e-6f);
+    }
+}
+
+static void test_integradores_lqi_iguais_ao_python(void)
+{
+    check_integrators(RWP_LAW_LQI, INT_LQI_VEC);
+}
+
+static void test_integradores_pid_iguais_ao_python(void)
+{
+    check_integrators(RWP_LAW_PID, INT_PID_VEC);
+}
+
+static void equilibra_e_rejeita_peteleco(rwp_law_t law)
+{
+    plant_t x = {0};
+    TEST_ASSERT_TRUE(rwp_set_law(&c, law));
+    start_balancing(&x);
+    run(&x, 1000, 0);
+    x.thd += 2.0;
+    rwp_outputs_t out = run(&x, 4000, 0);
+    TEST_ASSERT_EQUAL(RWP_BALANCE, out.state);
+    TEST_ASSERT_TRUE(fabs(x.th) < 1.5 * DEG);
+    TEST_ASSERT_TRUE(fabs(x.om) < 0.5 * RWP_W_MAX);
+}
+
+static void test_lqi_equilibra_e_rejeita_peteleco(void)
+{
+    equilibra_e_rejeita_peteleco(RWP_LAW_LQI);
+}
+
+static void test_pid_equilibra_e_rejeita_peteleco(void)
+{
+    equilibra_e_rejeita_peteleco(RWP_LAW_PID);
+}
+
+static void test_lei_nao_muda_durante_o_equilibrio(void)
+{
+    plant_t x = {0};
+    start_balancing(&x);
+    TEST_ASSERT_FALSE(rwp_set_law(&c, RWP_LAW_PID));
+    TEST_ASSERT_EQUAL(RWP_LAW_LQR, c.cfg.law);
+    press_button(&x);                       /* para: agora pode */
+    TEST_ASSERT_TRUE(rwp_set_law(&c, RWP_LAW_PID));
+    TEST_ASSERT_EQUAL_STRING("PID", rwp_law_name(c.cfg.law));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -506,5 +599,12 @@ int main(void)
     RUN_TEST(test_ensaio_manual_limita_e_expira);
     RUN_TEST(test_ensaio_manual_corta_por_rotacao);
     RUN_TEST(test_ciclo_nunca_passa_do_limite);
+    RUN_TEST(test_sequencia_lqi_igual_ao_python);
+    RUN_TEST(test_sequencia_pid_igual_ao_python);
+    RUN_TEST(test_integradores_lqi_iguais_ao_python);
+    RUN_TEST(test_integradores_pid_iguais_ao_python);
+    RUN_TEST(test_lqi_equilibra_e_rejeita_peteleco);
+    RUN_TEST(test_pid_equilibra_e_rejeita_peteleco);
+    RUN_TEST(test_lei_nao_muda_durante_o_equilibrio);
     return UNITY_END();
 }

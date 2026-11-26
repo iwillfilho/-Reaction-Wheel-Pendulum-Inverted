@@ -1,4 +1,4 @@
-"""Projeto do LQR e validação por simulação não linear.
+"""Projeto do LQR, do LQI e do PID e validação por simulação não linear.
 
 Uso:  python -m sim.lqr_design
 
@@ -12,7 +12,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from .controlador import polos_malha_fechada, projetar
+from .controlador import LEIS, PID_POLO, com_lei, discretizar_lqi, polos_malha_fechada, projetar
 from .params import NOMINAL, Params
 from .simulacao import Resultado, Sensores, inclinacao_maxima, simular
 
@@ -121,6 +121,53 @@ def _media_movel(y: np.ndarray, n: int) -> np.ndarray:
     return out
 
 
+NOMES_LEIS = {"lqr": "LQR + auto-ajuste", "lqi": "LQI", "pid": "PID + malha da roda"}
+
+
+def comparar_leis(p: Params, g) -> list[tuple]:
+    """As três leis nos mesmos ensaios: solta a 5°, dois petelecos e MPU6050 2° torto."""
+    linhas = []
+    for lei in LEIS:
+        gl = com_lei(g, lei)
+        r1 = simular(p, gl, theta0=math.radians(5.0), T=6.0, semente=1)
+        r2 = simular(p, gl, theta0=0.0, T=6.0, disturbios=[(1.0, 1.5), (3.5, -2.5)], semente=2)
+        r3 = simular(p, gl, theta0=0.0, T=20.0, sensores=Sensores(vies_angulo=math.radians(2.0)), semente=3)
+        rob = sum((not r.caiu) and r.acomodou(tol_theta=math.radians(1.5), tol_thd=0.5)
+                  for r in (simular(p, gl, theta0=math.radians(5.0), T=6.0, planta=variar(p, f), semente=1)
+                            for f in VARIACOES.values()))
+        w10 = float(np.mean(r3.omega[9500:10500])) * RPM
+        voltas = float(np.trapezoid(r3.omega, r3.t)) / (2.0 * math.pi)
+        linhas.append((NOMES_LEIS[lei], r1.acomodou(tol_theta=math.radians(1.0), tol_thd=0.3), r1.omega_pico * RPM,
+                       not r2.caiu, w10, voltas, rob, math.degrees(inclinacao_maxima(p, gl))))
+    return linhas
+
+
+def _grafico_leis(p: Params, g) -> str:
+    import matplotlib.pyplot as plt
+
+    from . import graficos as gr
+
+    gr.aplicar_estilo()
+    fig, (a1, a2) = plt.subplots(2, 1, figsize=(7.2, 6.0))
+    fig.suptitle("PID, LQR e LQI nos mesmos ensaios", x=0.07, ha="left", fontsize=12, fontweight="bold", color=gr.TINTA)
+    s = Sensores(vies_angulo=math.radians(2.0))
+    for lei, cor in zip(LEIS, gr.SERIES):
+        gl = com_lei(g, lei)
+        r = simular(p, gl, theta0=0.0, T=20.0, sensores=s, semente=3)
+        y = _media_movel(r.omega * RPM, 200)
+        a1.plot(r.t, y, color=cor, label=NOMES_LEIS[lei])
+        r2 = simular(p, gl, theta0=0.0, T=4.0, disturbios=[(0.5, 2.0)], semente=2)
+        a2.plot(r2.t, np.degrees(r2.theta), color=cor, label=NOMES_LEIS[lei])
+    a1.set_title("MPU6050 montado 2° torto: rotação da roda (rpm, média de 0,2 s)")
+    a1.set_xlabel("tempo (s)")
+    a1.legend(loc="lower right")
+    a2.set_title("Peteleco de 2 rad/s em t = 0,5 s: inclinação (graus)")
+    a2.set_xlabel("tempo (s)")
+    a2.legend(loc="upper right")
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    return gr.salvar(fig, "comparacao_leis.png")
+
+
 def main() -> None:
     p = NOMINAL
     g = projetar(p)
@@ -130,6 +177,13 @@ def main() -> None:
     polos = np.log(polos_malha_fechada(p, g).astype(complex)) / p.ts
     print("  polos de malha fechada (rad/s):", ", ".join(f"{z.real:.2f}{z.imag:+.2f}j" for z in sorted(polos, key=lambda z: z.real)))
     print(f"  auto-ajuste: trim' = {g.trim_ganho:.3e} · omega")
+    zl = np.log(np.linalg.eigvals(discretizar_lqi(p)[0] - discretizar_lqi(p)[1] @ g.KI).astype(complex)) / p.ts
+    print(f"\nGanhos LQI (x = [theta, theta', omega, phi_r]):")
+    print(f"  Q1 = {g.q1:.2f} V/rad   Q2 = {g.q2:.3f} V/(rad/s)   Q3 = {g.q3:.5f} V/(rad/s)   Q4 = {g.q4:.5f} V/rad")
+    print("  polos de malha fechada (rad/s):", ", ".join(f"{z.real:.2f}{z.imag:+.2f}j" for z in sorted(zl, key=lambda z: z.real)))
+    print(f"\nGanhos PID (polo triplo da malha de theta em -{PID_POLO:.0f} rad/s):")
+    print(f"  kp = {g.kp:.2f} V/rad   ki = {g.ki:.1f} V/(rad·s)   kd = {g.kd:.3f} V/(rad/s)")
+    print(f"  malha da roda: theta_ref = -({g.kw:.1e}·omega + {g.kwi:.1e}·phi_r)")
 
     th_max = inclinacao_maxima(p, g)
     print(f"\nMaior inclinação inicial recuperável: {math.degrees(th_max):.1f}° "
@@ -146,7 +200,14 @@ def main() -> None:
     f2 = _paineis(r2, p, "Resposta a dois petelecos no braço", "disturbio.png",
                   marcas=[(1.0, "+1,5 rad/s"), (3.5, "-2,5 rad/s")])
     f3 = _grafico_trim(p, g)
-    print("\nGráficos:", f1, f2, f3, sep="\n  ")
+
+    print("\nComparação das leis (solta a 5°, petelecos, MPU6050 2° torto, robustez):")
+    print(f"  {'lei':<22} {'5°':>4} {'pico 5°':>9} {'peteleco':>9} {'roda em 10 s':>13} {'voltas':>7} {'robustez':>9} {'máx':>6}")
+    for nome, ok, pico, pet, w10, voltas, rob, thm in comparar_leis(p, g):
+        print(f"  {nome:<22} {'sim' if ok else 'NÃO':>4} {pico:6.0f} rpm {'ok' if pet else 'cai':>9} {w10:9.0f} rpm "
+              f"{voltas:7.1f} {rob:>4}/{len(VARIACOES)} {thm:5.1f}°")
+    f4 = _grafico_leis(p, g)
+    print("\nGráficos:", f1, f2, f3, f4, sep="\n  ")
 
 
 if __name__ == "__main__":

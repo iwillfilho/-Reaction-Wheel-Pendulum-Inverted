@@ -15,8 +15,8 @@ from pathlib import Path
 import numpy as np
 
 from cad.folgas import derivar, ler_parametros
-from .controlador import (DESVIO_OMEGA, DESVIO_THETA, DESVIO_THETA_DOT, DESVIO_U, discretizar,
-                          polos_malha_fechada, projetar)
+from .controlador import (DESVIO_OMEGA, DESVIO_PHI, DESVIO_THETA, DESVIO_THETA_DOT, DESVIO_U, PID_POLO,
+                          discretizar, discretizar_lqi, polos_malha_fechada, projetar)
 from .model import Planta
 from .params import NOMINAL, Params
 from .simulacao import inclinacao_maxima
@@ -158,6 +158,25 @@ def gerar(p: Params = NOMINAL) -> str:
         v[nome + "Dim"] = r" \times ".join(f"{x:.0f}" for x in d.get("dimensoes_mm", [0, 0, 0]))
     v["vCadRodaInercia"] = n(massas.get("roda", {}).get("I_eixo_gm2", float("nan")) * 1e-3, 3)
 
+    # LQI e PID
+    from .lqr_design import VARIACOES, comparar_leis
+
+    Ad4, Bd4 = discretizar_lqi(p)
+    polos_lqi = np.log(np.linalg.eigvals(Ad4 - Bd4 @ g.KI).astype(complex)) / p.ts
+    v.update({
+        "vDesvPhi": n(DESVIO_PHI / (2 * math.pi)), "vTrimMax": n(math.degrees(g.trim_max)),
+        "vPidPolo": n(PID_POLO), "vPidKp": n(g.kp), "vPidKi": n(g.ki), "vPidKd": n(g.kd),
+        "vPidKw": n(g.kw), "vPidKwi": n(g.kwi), "vPidImax": n(g.pid_i_max), "vCoefGpid": n(m.kt / m.R, 3),
+        "vNvariacoes": str(len(VARIACOES)),
+    })
+    leis = comparar_leis(p, g)
+    for chave, (_, _, pico, _, w10, voltas, rob, thm) in zip(("Lqr", "Lqi", "Pid"), leis):
+        v[f"vCmp{chave}Pico"] = n(pico, 2)
+        v[f"vCmp{chave}Roda"] = n(abs(w10), 2)
+        v[f"vCmp{chave}Voltas"] = n(abs(voltas), 2)
+        v[f"vCmp{chave}Rob"] = str(rob)
+        v[f"vCmp{chave}Max"] = n(thm, 3)
+
     linhas = ["% ARQUIVO GERADO por sim/export_relatorio.py - não edite à mão.",
               "% Mude sim/params.py e rode: python -m sim.export_relatorio"]
     linhas += [rf"\newcommand{{\{k}}}{{{val}}}" for k, val in v.items()]
@@ -174,6 +193,8 @@ def gerar(p: Params = NOMINAL) -> str:
         rf"\newcommand{{\polosMA}}{{{lista_polos(polos_ma)}}}",
         rf"\newcommand{{\polosMFz}}{{{lista_polos(polos_z, 5)}}}",
         rf"\newcommand{{\polosMFs}}{{{lista_polos(polos_s)}}}",
+        rf"\newcommand{{\matKI}}{{{matriz(g.KI)}}}",
+        rf"\newcommand{{\polosLQI}}{{{lista_polos(polos_lqi)}}}",
         r"\newcommand{\tabelaPinos}{%",
         tabela_pinos(),
         "}",
@@ -184,6 +205,7 @@ def gerar(p: Params = NOMINAL) -> str:
 
 FIGURAS = [
     "sim/out/dimensionamento.png",
+    "sim/out/comparacao_leis.png",
     "cad/previews/montagem_0graus_iso.png",
     "cad/previews/montagem_25graus_frente.png",
     "cad/previews/montagem_lado.png",

@@ -13,7 +13,7 @@ import math
 import random
 from pathlib import Path
 
-from .controlador import lei_controle, projetar
+from .controlador import Integradores, com_lei, lei_controle, projetar
 from .model import Planta
 from .params import NOMINAL, Params
 from .simulacao import simular
@@ -70,6 +70,21 @@ def gerar_ganhos(p: Params, g) -> str:
         f"#define RWP_TRIM_GAIN     ({_f(g.trim_ganho)})",
         f"#define RWP_TRIM_MAX      ({_f(g.trim_max)})   /* rad */",
         "",
+        "/* LQI: u = -(Q1*theta + Q2*theta_dot + Q3*omega + Q4*phi_r)  [V], phi_r = ângulo da roda */",
+        f"#define RWP_Q1            ({_f(g.q1)})   /* V/rad      */",
+        f"#define RWP_Q2            ({_f(g.q2)})   /* V/(rad/s)  */",
+        f"#define RWP_Q3            ({_f(g.q3)})   /* V/(rad/s)  */",
+        f"#define RWP_Q4            ({_f(g.q4)})   /* V/rad      */",
+        "",
+        "/* PID: u = KP*e + KI*int(e) + KD*theta_dot, e = theta - theta_ref,",
+        "        theta_ref = -(KW*omega + KWI*phi_r)  (malha externa na roda) */",
+        f"#define RWP_PID_KP        ({_f(g.kp)})   /* V/rad      */",
+        f"#define RWP_PID_KI        ({_f(g.ki)})   /* V/(rad.s)  */",
+        f"#define RWP_PID_KD        ({_f(g.kd)})   /* V/(rad/s)  */",
+        f"#define RWP_PID_KW        ({_f(g.kw)})   /* rad por rad/s */",
+        f"#define RWP_PID_KWI       ({_f(g.kwi)})   /* rad por rad   */",
+        f"#define RWP_PID_I_MAX     ({_f(g.pid_i_max)})   /* rad.s */",
+        "",
         "/* Segurança */",
         f"#define RWP_THETA_CUT     ({_f(THETA_CORTE)})   /* rad ({math.degrees(THETA_CORTE):.0f} graus) */",
         f"#define RWP_THETA_ENGAGE  ({_f(THETA_ENGATE)})   /* rad ({math.degrees(THETA_ENGATE):.0f} graus) */",
@@ -124,6 +139,44 @@ def gerar_vetores(p: Params, g, n_lei: int = 96, n_seq: int = 1500) -> str:
     out += ["    " + ", ".join(cont[i:i + 16]) + "," for i in range(0, n_seq, 16)]
     out += [
         "};",
+        "",
+    ]
+    for lei in ("lqi", "pid"):
+        rl = simular(p, com_lei(g, lei), theta0=theta0, T=n_seq * p.ts, realista=True,
+                     disturbios=[(0.7, -1.5)], semente=11)
+        sl = rl.extras["entradas"]
+        assert not rl.caiu and len(sl) == n_seq
+        nome = lei.upper()
+        out += [
+            "",
+            f"/* Mesma sequência com a lei {nome}: {{theta_acel, giro, u_esperado}} e a contagem. */",
+            f"static const float SEQ_{nome}_VEC[N_SEQ][3] = {{",
+        ]
+        out += [f"    {{{_f(a)}, {_f(b)}, {_f(u)}}}," for a, b, _, u in sl]
+        out += ["};", f"static const int SEQ_{nome}_COUNT[N_SEQ] = {{"]
+        cl = [str(c) for _, _, c, _ in sl]
+        out += ["    " + ", ".join(cl[i:i + 16]) + "," for i in range(0, n_seq, 16)]
+        out += ["};"]
+    # Integradores do LQI e do PID sozinhos, com saturação e roda disparando: exercita o anti-windup.
+    n_int = 600
+    out += ["", f"#define N_INT {n_int}",
+            "/* rwp_balance_law(): {theta, theta_dot, omega, phi, vbus, u_esperado, ref_esperado} */"]
+    for lei in ("lqi", "pid"):
+        gl, it, phi = com_lei(g, lei), Integradores(0.0), 0.0
+        linhas = []
+        for k in range(n_int):
+            t = k * p.ts
+            th = 0.12 * math.sin(2.0 * math.pi * 1.5 * t) + (0.25 if 200 <= k < 260 else 0.0)
+            thd = 0.12 * 2.0 * math.pi * 1.5 * math.cos(2.0 * math.pi * 1.5 * t)
+            om = 150.0 * math.sin(2.0 * math.pi * 0.8 * t) + (120.0 if k >= 400 else 0.0)
+            phi += om * p.ts
+            vb = 12.0 - 1.5 * math.sin(2.0 * math.pi * 0.5 * t)
+            u = it.passo(gl, th, thd, om, phi, vb)
+            linhas.append((th, thd, om, phi, vb, u, it.ref))
+        out += [f"static const float INT_{lei.upper()}_VEC[N_INT][7] = {{"]
+        out += ["    {" + ", ".join(_f(v) for v in ln) + "}," for ln in linhas]
+        out += ["};"]
+    out += [
         "",
         "/* Planta nominal, para o teste de malha fechada em C */",
         f"#define PLANT_J     ({_f(pl.J)})",

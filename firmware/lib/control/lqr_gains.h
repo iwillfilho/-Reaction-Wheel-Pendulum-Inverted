@@ -27,6 +27,21 @@
 #define RWP_TRIM_GAIN     (-0.000108703605f)
 #define RWP_TRIM_MAX      (0.0698131701f)   /* rad */
 
+/* LQI: u = -(Q1*theta + Q2*theta_dot + Q3*omega + Q4*phi_r)  [V], phi_r = ângulo da roda */
+#define RWP_Q1            (-289.249534f)   /* V/rad      */
+#define RWP_Q2            (-30.0903435f)   /* V/(rad/s)  */
+#define RWP_Q3            (-0.668524126f)   /* V/(rad/s)  */
+#define RWP_Q4            (-0.569270606f)   /* V/rad      */
+
+/* PID: u = KP*e + KI*int(e) + KD*theta_dot, e = theta - theta_ref,
+        theta_ref = -(KW*omega + KWI*phi_r)  (malha externa na roda) */
+#define RWP_PID_KP        (161.438643f)   /* V/rad      */
+#define RWP_PID_KI        (702.182125f)   /* V/(rad.s)  */
+#define RWP_PID_KD        (9.36242833f)   /* V/(rad/s)  */
+#define RWP_PID_KW        (0.001f)   /* rad por rad/s */
+#define RWP_PID_KWI       (0.00025f)   /* rad por rad   */
+#define RWP_PID_I_MAX     (0.02f)   /* rad.s */
+
 /* Segurança */
 #define RWP_THETA_CUT     (0.34906585f)   /* rad (20 graus) */
 #define RWP_THETA_ENGAGE  (0.0523598776f)   /* rad (3 graus) */

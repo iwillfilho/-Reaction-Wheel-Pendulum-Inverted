@@ -16,6 +16,13 @@
 
 #define RWP_N_EVENTS 16   /* mudanças de contagem guardadas pelo estimador de velocidade */
 
+/* Lei usada no equilíbrio. Troca pelo comando "lei" com o controle fora de EQUILIBRA. */
+typedef enum {
+    RWP_LAW_LQR = 0,   /* LQR + auto-ajuste do ângulo de equilíbrio */
+    RWP_LAW_LQI,       /* LQR com o ângulo da roda como quarto estado */
+    RWP_LAW_PID        /* PID em theta + malha externa PI na roda */
+} rwp_law_t;
+
 typedef struct {
     /* lei de controle: u = -(k1*theta + k2*theta_dot + k3*omega) */
     float k1, k2, k3;
@@ -39,6 +46,14 @@ typedef struct {
     float thetadot_engage;
     float w_max;             /* limite de rotação da roda */
     float manual_duty_max;   /* limite do modo de ensaio em malha aberta */
+    /* lei do equilíbrio */
+    rwp_law_t law;
+    /* LQI: u = -(q1*theta + q2*theta_dot + q3*omega + q4*phi_r), phi_r = ângulo da roda */
+    float q1, q2, q3, q4;
+    /* PID: u = kp*e + ki*int(e) + kd*theta_dot, e = theta - theta_ref,
+            theta_ref = -(kw*omega + kwi*phi_r), |theta_ref| <= trim_max */
+    float kp, ki, kd, kw, kwi;
+    float pid_i_max;         /* rad.s: limite da integral de e */
 } rwp_config_t;
 
 typedef enum {
@@ -79,7 +94,8 @@ typedef struct {
     float u;             /* tensão comandada [V] */
     rwp_state_t state;
     rwp_fault_t fault;
-    float theta, theta_dot, omega, trim;
+    float theta, theta_dot, omega;
+    float trim;          /* ângulo de equilíbrio em uso [rad]: auto-ajuste (LQR) ou o equivalente do LQI/PID */
 } rwp_outputs_t;
 
 typedef struct {
@@ -90,6 +106,12 @@ typedef struct {
     float theta, theta_dot, omega, w_raw;
     float gyro_bias;
     float trim;
+    /* integradores do LQI e do PID */
+    float phi_ref;       /* ângulo da roda tomado como zero ao entrar em equilíbrio [rad] */
+    float z_prev;        /* phi_r do período anterior */
+    float i_e;           /* integral do erro de theta (PID) */
+    float ref;           /* ângulo de equilíbrio equivalente [rad] */
+    bool int_sat;        /* tensão saturada no período anterior: integradores congelados */
     /* estimador de velocidade: instante e valor das últimas mudanças de contagem */
     int32_t cnt_prev;
     uint32_t now;
@@ -116,6 +138,13 @@ void rwp_step(rwp_t *c, const rwp_inputs_t *in, rwp_outputs_t *out);
 /* Lei de controle com limite de corrente e de tensão. Retorna a tensão [V]. */
 float rwp_lqr_law(const rwp_config_t *g, float theta_e, float theta_dot, float omega, float vbus);
 
+/* LQI ou PID (cfg.law), com anti-windup. Atualiza os integradores. Retorna a tensão [V].
+   phi = ângulo acumulado da roda [rad]. Mesma sequência de Integradores.passo() em Python. */
+float rwp_balance_law(rwp_t *c, float theta, float theta_dot, float omega, float phi, float vbus);
+
+/* Troca a lei do equilíbrio. Recusa (retorna false) durante o equilíbrio. */
+bool rwp_set_law(rwp_t *c, rwp_law_t law);
+
 /* Velocidade da roda pelos instantes das últimas contagens + passa-baixa. */
 float rwp_wheel_speed(rwp_t *c, int32_t count);
 
@@ -124,5 +153,6 @@ void rwp_test_force_balance(rwp_t *c, float theta0);
 
 const char *rwp_state_name(rwp_state_t s);
 const char *rwp_fault_name(rwp_fault_t f);
+const char *rwp_law_name(rwp_law_t l);
 
 #endif /* RWP_CONTROL_H */

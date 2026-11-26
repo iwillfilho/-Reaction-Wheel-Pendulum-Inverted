@@ -53,6 +53,10 @@ rwp_config_t rwp_config_default(void)
         .theta_cut = RWP_THETA_CUT, .theta_engage = RWP_THETA_ENGAGE,
         .thetadot_engage = RWP_THETADOT_ENGAGE, .w_max = RWP_W_MAX,
         .manual_duty_max = 0.45f,   /* em vazio fica abaixo do limite de rotação */
+        .law = RWP_LAW_LQR,
+        .q1 = RWP_Q1, .q2 = RWP_Q2, .q3 = RWP_Q3, .q4 = RWP_Q4,
+        .kp = RWP_PID_KP, .ki = RWP_PID_KI, .kd = RWP_PID_KD, .kw = RWP_PID_KW, .kwi = RWP_PID_KWI,
+        .pid_i_max = RWP_PID_I_MAX,
     };
     return g;
 }
@@ -77,6 +81,75 @@ float rwp_lqr_law(const rwp_config_t *g, float theta_e, float theta_dot, float o
     /* limite de tensão */
     float um = g->u_frac * vbus;
     return clampf(u, -um, um);
+}
+
+/* Anti-windup do integrador da roda [rad]: o efeito dele fica limitado ao mesmo
+   ângulo de equilíbrio equivalente do auto-ajuste (trim_max). */
+static float phi_max(const rwp_config_t *g)
+{
+    if (g->law == RWP_LAW_LQI && g->q4 != 0.0f) {
+        return g->trim_max * fabsf(g->q1 / g->q4);
+    }
+    if (g->law == RWP_LAW_PID && g->kwi != 0.0f) {
+        return g->trim_max / g->kwi;
+    }
+    return 1e30f;
+}
+
+float rwp_balance_law(rwp_t *c, float theta, float theta_dot, float omega, float phi, float vbus)
+{
+    const rwp_config_t *g = &c->cfg;
+    float z = phi - c->phi_ref;
+    if (c->int_sat) {               /* congela: a roda anda, o integrador não */
+        z = c->z_prev;
+        c->phi_ref = phi - z;
+    }
+    float zm = phi_max(g);
+    if (fabsf(z) > zm) {
+        z = copysignf(zm, z);
+        c->phi_ref = phi - z;
+    }
+    c->z_prev = z;
+
+    float u0;
+    if (g->law == RWP_LAW_LQI) {
+        u0 = -(g->q1 * theta + g->q2 * theta_dot + g->q3 * omega + g->q4 * z);
+        c->ref = -g->q4 * z / g->q1;
+    } else {
+        c->ref = clampf(-(g->kw * omega + g->kwi * z), -g->trim_max, g->trim_max);
+        float e = theta - c->ref;
+        if (!c->int_sat) {
+            c->i_e = clampf(c->i_e + e * g->ts, -g->pid_i_max, g->pid_i_max);
+        }
+        u0 = g->kp * e + g->ki * c->i_e + g->kd * theta_dot;
+    }
+
+    /* mesmos limites de corrente e de tensão do LQR */
+    float bemf = g->ke * omega;
+    float u = clampf(u0, bemf - g->r_motor * g->i_max, bemf + g->r_motor * g->i_max);
+    float um = g->u_frac * vbus;
+    u = clampf(u, -um, um);
+    c->int_sat = fabsf(u) >= 0.9f * um;
+    return u;
+}
+
+static void reset_integrators(rwp_t *c)
+{
+    c->phi_ref = (float)c->cnt_prev * c->cfg.rad_per_count;
+    c->z_prev = 0.0f;
+    c->i_e = 0.0f;
+    c->ref = 0.0f;
+    c->int_sat = false;
+}
+
+bool rwp_set_law(rwp_t *c, rwp_law_t law)
+{
+    if (c->state == RWP_BALANCE || (unsigned)law > (unsigned)RWP_LAW_PID) {
+        return false;
+    }
+    c->cfg.law = law;
+    reset_integrators(c);
+    return true;
 }
 
 static void push_event(rwp_t *c, uint32_t tick, int32_t count)
@@ -153,6 +226,9 @@ static void enter(rwp_t *c, rwp_state_t s)
     }
     if (s == RWP_IDLE) {
         c->fault = RWP_FAULT_NONE;
+    }
+    if (s == RWP_BALANCE) {
+        reset_integrators(c);
     }
 }
 
@@ -295,7 +371,12 @@ void rwp_step(rwp_t *c, const rwp_inputs_t *in, rwp_outputs_t *out)
         if (check_running_faults(c, in)) {
             break;
         }
-        u = rwp_lqr_law(g, c->theta - c->trim, c->theta_dot, c->omega, in->vbus);
+        if (g->law == RWP_LAW_LQR) {
+            u = rwp_lqr_law(g, c->theta - c->trim, c->theta_dot, c->omega, in->vbus);
+        } else {
+            u = rwp_balance_law(c, c->theta, c->theta_dot, c->omega,
+                                (float)in->enc_count * g->rad_per_count, in->vbus);
+        }
         duty = u / in->vbus;
         enable = true;
 
@@ -306,7 +387,7 @@ void rwp_step(rwp_t *c, const rwp_inputs_t *in, rwp_outputs_t *out)
             fail(c, RWP_FAULT_STALL);
             break;
         }
-        if (!saturated) {
+        if (!saturated && g->law == RWP_LAW_LQR) {
             c->trim = clampf(c->trim + g->trim_gain * c->omega * g->ts, -g->trim_max, g->trim_max);
         }
         break;
@@ -354,7 +435,7 @@ void rwp_step(rwp_t *c, const rwp_inputs_t *in, rwp_outputs_t *out)
     out->theta = c->theta;
     out->theta_dot = c->theta_dot;
     out->omega = c->omega;
-    out->trim = c->trim;
+    out->trim = (g->law == RWP_LAW_LQR) ? c->trim : c->ref;
 }
 
 void rwp_test_force_balance(rwp_t *c, float theta0)
@@ -374,12 +455,19 @@ void rwp_test_force_balance(rwp_t *c, float theta0)
     c->ev_n = 1;
     c->t_state = 0;
     c->n_engage = c->n_overspeed = c->n_imu_miss = c->n_vbus_low = c->n_sat = 0;
+    reset_integrators(c);
 }
 
 const char *rwp_state_name(rwp_state_t s)
 {
     static const char *const names[] = {"PARADO", "CALIBRA", "ARMADO", "EQUILIBRA", "MANUAL", "FALHA"};
     return ((unsigned)s < sizeof(names) / sizeof(names[0])) ? names[s] : "?";
+}
+
+const char *rwp_law_name(rwp_law_t l)
+{
+    static const char *const names[] = {"LQR", "LQI", "PID"};
+    return ((unsigned)l < sizeof(names) / sizeof(names[0])) ? names[l] : "?";
 }
 
 const char *rwp_fault_name(rwp_fault_t f)
