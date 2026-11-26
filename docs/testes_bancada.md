@@ -13,7 +13,7 @@ ou o dedo no botão KEY da placa.
 ```bash
 source .venv/bin/activate
 cd firmware && pio run -t upload && cd ..       # grava pelo ST-Link
-python tools/telemetry_log.py --porta /dev/ttyUSB0   # terminal + gravação em logs/
+python tools/telemetry_log.py --porta /dev/ttyACM0   # USB-C da Black Pill; terminal + gravação em logs/
 python tools/plot_log.py logs/ARQUIVO.csv            # gráfico de um log
 ```
 

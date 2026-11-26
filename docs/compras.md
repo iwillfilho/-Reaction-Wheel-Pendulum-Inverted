@@ -17,7 +17,6 @@ analisador lógico de 8 canais · placa adaptadora de bornes para Arduino Nano.
 |---|---|---|
 | Fonte 12 V ≥ 10 A | 1 | chaveada; a ATX pode desarmar na frenagem |
 | Fusível 10 A retardado + porta-fusível | 1 | no positivo, logo depois da fonte |
-| TVS SMBJ15A | 1 | |
 | Capacitor eletrolítico 4700 µF / 35 V | 2 | |
 | Capacitor cerâmico 100 nF | **6** | era 1: +3 no motor, +1 no PA4, +1 de reserva |
 | Resistores | — | 10 k (×2: divisor e pull-down do EN), 2,2 k (×1); opcional 10 k (×4) para R_IS/L_IS |
@@ -36,17 +35,16 @@ analisador lógico de 8 canais · placa adaptadora de bornes para Arduino Nano.
 | Item | Qtd. | Por quê |
 |---|---|---|
 | Black Pill **WeAct STM32F411CEU6** | 1 | prefira a original WeAct (cristal de 25 MHz, botão KEY em PA0) |
-| **ST-Link V2** (clone USB serve) | 1 | gravar e depurar; a Nucleo tinha um embutido |
+| **ST-Link V2** (clone USB serve) | 1 | é por ele que o firmware é gravado e depurado; a Nucleo tinha um embutido |
 | Barra de pinos fêmea 1 × 20 | 2 | para soquetar a Black Pill na placa perfurada |
 | Jumpers fêmea-fêmea | ~10 | ST-Link e testes |
-| Cabo USB-C de dados | 1 | só para gravação por DFU, se o ST-Link falhar |
+| Cabo USB-C de dados | 1 | alimenta a Black Pill e leva a telemetria e os comandos (porta serial virtual) |
 
 **Recomendados**
 
 | Item | Qtd. | Por quê |
 |---|---|---|
 | Conversor buck 12 V → 5 V (LM2596 ou MP1584) | 1 | alimenta a placa pela própria fonte de 12 V |
-| Adaptador USB-serial **3,3 V** (CP2102 ou CH340) | 1 | telemetria e comandos durante os ensaios |
 | Insertos térmicos M3 | 18 no total | 4 roda, 2+2 braço, 4 colunas da bandeja, 2 suportes da barra, 2 postes, 2 de reserva |
 | Parafusos M3 sortidos + porcas + espaçadores de náilon 3 mm | kit | M3×8 (flange, bandeja), M3×10 (suporte, sensores), M3×12 (MPU, travas da barra), M3×16 (postes) |
 | Cola de contato | 1 | almofadas de TPU nos batentes |

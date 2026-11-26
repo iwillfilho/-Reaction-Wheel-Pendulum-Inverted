@@ -371,9 +371,9 @@ Parte & Situação & Como conferir \\
 \midrule
 \arq{sim/} & modelo por Euler-Lagrange e LQR; $K = [-248{,}9;\ -25{,}85;\ -0{,}245]$;
   recupera o braço solto de até 19,8° (o limite físico do torque é 22,4°) &
-  \cmd{pytest sim/tests} (34 testes) \\
+  \cmd{pytest sim/tests} (50 testes) \\
 \arq{firmware/} & compila para a Black Pill; máquina de estados, proteções, telemetria a
-  \qty{200}{\hertz} & \cmd{pio test -e native} (23 testes) e \cmd{pio run} \\
+  \qty{200}{\hertz} & \cmd{pio test -e native} (30 testes) e \cmd{pio run} \\
 \arq{cad/} & 6 peças paramétricas, cerca de 40 folgas conferidas, STLs prontos &
   \cmd{python cad/folgas.py} \\
 \arq{tools/} & gravação da telemetria em CSV, gráficos, identificação do motor e do
@@ -1101,7 +1101,7 @@ que estiver atrasado e para revisar a fiação no papel.
 source .venv/bin/activate
 pytest sim/tests                 # 34 passed
 cd firmware
-pio test -e native               # 23 testes, todos OK
+pio test -e native               # 30 testes, todos OK
 pio run                          # SUCCESS
 cd ..
 sudo apt install pulseview sigrok-firmware-fx2lafw dfu-util
@@ -1778,7 +1778,7 @@ Base de volta na posição normal e presa na mesa; proteção no lugar; óculos;
   \item Desligue e ligue a placa: \cmd{cfg} tem que mostrar os sinais e os ganhos
     definitivos sem nenhum comando pela serial.
 \end{passos}
-\textbf{Aceite:} 34 + 23 testes passando e \cmd{cfg} correto depois de religar.
+\textbf{Aceite:} 50 + 30 testes passando e \cmd{cfg} correto depois de religar.
 \end{tarefa}
 
 \begin{tarefa}[critica]{T8.2}{Lista de aceite do hardware}{todas}{45 min}{T8.1}
@@ -1900,7 +1900,7 @@ source .venv/bin/activate
 \begin{verbatim}
 python -m sim.export_gains        # lqr_gains.h, vetores de teste e dimensoes_geradas.scad
 python -m sim.export_relatorio    # relatorio/valores.tex (senão um teste falha)
-pytest sim/tests                  # 34 testes
+pytest sim/tests                  # 50 testes
 cd firmware && pio test -e native && pio run -t upload && cd ..
 \end{verbatim}
 \end{comandos}
@@ -1938,6 +1938,7 @@ Comando & Efeito \\
 \cmd{imax <A>} & limite de corrente, de 0,5 a 20~A \\
 \cmd{trim <graus>} & ângulo de equilíbrio, até $\pm$5° \\
 \cmd{trimg <v>} & ganho do auto-ajuste do ângulo (0 desliga) \\
+\cmd{lei lqr|lqi|pid} & lei do equilíbrio: LQR com auto-ajuste (padrão), LQI ou PID; só fora de EQUILIBRA \\
 \cmd{rate <n>} & telemetria a cada $n$~ms (0 desliga) \\
 \cmd{inv motor|enc|giro|ang} & inverte um sinal; só com o controle parado \\
 \cmd{sinais} & confere o sinal do giroscópio (balance o braço por 3~s) \\

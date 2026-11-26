@@ -108,15 +108,14 @@ a malha de controle a \qty{\vFs}{\hertz} e comanda a ponte H BTS7960 por PWM de
   \node[bloco, right=14mm of bp] (ibt) {Ponte H\\BTS7960 (IBT-2)};
   \node[bloco, right=12mm of ibt] (mot) {Motor 775\\+ roda de reação};
   \node[bloco, below=12mm of mot, fill=orange!8] (pend) {Pêndulo\\$\theta$, $\dot\theta$, $\omega$};
-  \node[bloco, above=9mm of ibt] (fonte) {Fonte \qty{\vVbus}{\volt}\\+ fusível};
-  \node[bloco, below=10mm of bp] (ser) {Adaptador USB-serial\\telemetria e comandos};
+  \node[bloco, above=9mm of ibt] (fonte) {Fonte chaveada\\\qty{\vVbus}{\volt}, \qty{10}{\ampere}};
+  \node[bloco, below=10mm of bp] (ser) {Notebook (USB-C)\\\qty{5}{\volt}, telemetria e comandos};
   \draw[seta] (mpu) -- node[rot]{I2C \qty{400}{\kilo\hertz}} (bp);
   \draw[seta] (enc) -- node[rot]{TIM2 quadratura} (bp);
   \draw[seta] (bp) -- node[rot]{PWM} (ibt);
   \draw[seta] (ibt) -- node[rot]{\qty{0}{}--\qty{\vVbus}{\volt}} (mot);
   \draw[seta] (fonte) -- (ibt);
-  \draw[seta] (fonte.west) -| node[rot, pos=0.25]{buck \qty{5}{\volt}} (bp.north);
-  \draw[seta, <->] (bp) -- node[rot]{UART} (ser);
+  \draw[seta, <->] (bp) -- node[rot]{USB (porta serial virtual)} (ser);
   \draw[fis] (mot) -- node[rot]{torque de reação} (pend);
   \draw[fis] (pend.south) |- ++(0,-6mm) -| ($(enc.south)+(0,0)$) node[pos=0.25, font=\scriptsize, below]{giro da roda};
   \draw[fis] (pend.east) -- ++(6mm,0) |- ($(mpu.north)+(0,6mm)$) -- (mpu.north) node[pos=0.0, font=\scriptsize, above, xshift=30mm]{inclinação do braço};
@@ -547,6 +546,123 @@ $\dot\theta$ vem do giroscópio; $\omega$ vem do encoder, dividindo a variação
 tempo entre as últimas transições, o que funciona tanto em baixa quanto em alta rotação.
 
 % =====================================================================
+\section{Leis alternativas: LQI e PID}
+\label{sec:leis}
+
+O firmware tem três leis para o equilíbrio, escolhidas pela serial com o comando
+\texttt{lei lqr|lqi|pid} (fora do estado EQUILIBRA): o LQR da Seção~\ref{sec:lqr} com o
+auto-ajuste do ângulo de equilíbrio, o LQI e um PID. As três usam os mesmos estimadores, os
+mesmos limites de corrente e tensão e a mesma máquina de estados; só muda a conta que transforma
+o estado em tensão.
+
+\subsection{O problema que o integrador resolve}
+
+O MPU6050 nunca fica montado perfeitamente alinhado com o braço, e o centro de massa nunca fica
+exatamente sobre o pivô. O resultado é um viés $\beta$: o ângulo medido é $\theta + \beta$. O
+LQR sozinho equilibra mesmo assim, mas o equilíbrio que ele encontra tem a roda girando: em
+regime, a lei $u = -K\vt{x}$ precisa produzir a tensão que mantém a roda em rotação constante,
+e o termo $K_1\beta$ é compensado por $K_3\omega$. A roda girando consome margem de tensão (a
+força contraeletromotriz cresce com $\omega$) e aproxima a proteção de rotação.
+
+O auto-ajuste resolve isso devagar: ele integra $\omega$ e desloca o ângulo de referência até a
+roda parar, com constante de tempo de alguns segundos para não interferir na malha rápida. LQI e
+PID fazem a mesma correção dentro da própria lei.
+
+\subsection{LQI}
+
+O LQI acrescenta ao estado o ângulo da roda desde a entrada em equilíbrio,
+$\varphi_r = \int \omega\,\dd t$, que o encoder mede diretamente (não há integração numérica):
+\begin{equation}
+  \dot{\vt{x}}_a = \begin{bmatrix} A & 0 \\ \begin{bmatrix} 0 & 0 & 1 \end{bmatrix} & 0 \end{bmatrix} \vt{x}_a
+  + \begin{bmatrix} B \\ 0 \end{bmatrix} u,
+  \qquad \vt{x}_a = \begin{bmatrix} \theta & \dot\theta & \omega & \varphi_r \end{bmatrix}^{\mathsf T}.
+\end{equation}
+A planta aumentada é discretizada com o mesmo período e o ganho sai da mesma equação de Riccati,
+com os pesos de Bryson do LQR mais um para $\varphi_r$ (\num{\vDesvPhi} voltas de roda
+aceitáveis):
+\begin{equation}
+  u = -K_I\,\vt{x}_a, \qquad K_I = \matKI ,
+\end{equation}
+com polos de malha fechada em $\polosLQI$~\unit{\radian\per\second}. Em regime $\omega = 0$, e a
+lei só fica parada se $K_{I,1}(\theta + \beta) + K_{I,4}\varphi_r = 0$: o integrador aprende o
+viés, e $-K_{I,4}\varphi_r / K_{I,1}$ é o ângulo de equilíbrio equivalente que a telemetria mostra.
+
+\subsection{PID}
+
+Perto da vertical e com a roda devagar, a tensão vira torque com ganho
+$g = k_t/R = \qty{\vCoefGpid}{\newton\metre\per\volt}$ e o braço obedece
+$J\ddot\theta = Mgl\,\theta - g\,u$. Com $u = k_p e + k_i \int e\,\dd t + k_d\dot\theta$ e
+$e = \theta - \theta_{\text{ref}}$, a malha de $\theta$ fica
+\begin{equation}
+  J s^3 + g k_d s^2 + (g k_p - Mgl)\, s + g k_i = 0 .
+\end{equation}
+Um polo triplo em $s = -p$, com $p = \qty{\vPidPolo}{\radian\per\second}$, dá
+\begin{equation}
+  k_p = \frac{Mgl + 3p^2 J}{g} = \num{\vPidKp}, \qquad
+  k_i = \frac{p^3 J}{g} = \num{\vPidKi}, \qquad
+  k_d = \frac{3 p J}{g} = \num{\vPidKd}
+\end{equation}
+(em \unit{\volt\per\radian}, \unit{\volt\per\radian\per\second} e
+\unit{\volt\second\per\radian}). Polos mais rápidos que cerca de \qty{20}{\radian\per\second}
+fazem a parcela integral saturar a tensão e o braço cai; a simulação confirma esse limite.
+
+Um PID só em $\theta$ não enxerga a roda: com viés, a integral de $e$ leva o ângulo
+\emph{medido} a zero, o braço fica inclinado de $-\beta$, a gravidade exige torque contínuo e a roda
+acelera até a proteção de rotação. Por isso o PID tem uma malha externa lenta na roda, que gera a
+referência de ângulo:
+\begin{equation}
+  \theta_{\text{ref}} = -\bigl(k_w\,\omega + k_{wi}\,\varphi_r\bigr), \qquad
+  k_w = \num{\vPidKw}, \quad k_{wi} = \num{\vPidKwi} .
+\end{equation}
+
+\subsection{Anti-windup}
+
+Enquanto a tensão está saturada ($|u| \ge 0{,}9\,u_{\max}$), os dois integradores congelam: o
+zero do ângulo da roda acompanha a roda e a integral de $e$ para. Além disso, o efeito do
+integrador da roda fica limitado ao mesmo ângulo de equilíbrio do auto-ajuste,
+$\pm\qty{\vTrimMax}{\degree}$: $|K_{I,4}\varphi_r/K_{I,1}|$ no LQI e $|\theta_{\text{ref}}|$ no
+PID; a integral de $e$ fica em $\pm\num{\vPidImax}$~\unit{\radian\second}. O código C
+(\texttt{rwp\_balance\_law}) é conferido passo a passo contra a referência em Python, inclusive
+com a tensão saturada e a roda disparando.
+
+\subsection{Comparação}
+
+A Tabela~\ref{tab:leis} e a Figura~\ref{fig:leis} comparam as três leis na simulação realista
+(ruído e atraso da IMU, indutância do motor, encoder quantizado).
+
+\begin{table}[H]
+\centering
+\caption{As três leis nos mesmos ensaios. ``Roda em 10 s'' e ``voltas'': MPU6050 montado
+\qty{2}{\degree} torto. Robustez: em quantos dos \vNvariacoes{} casos com parâmetros errados
+(\texttt{sim/lqr\_design.py}) o braço solto a \qty{5}{\degree} se acomoda.}
+\label{tab:leis}
+\begin{tabular}{lrrrrr}
+\toprule
+Lei & Pico da roda & Roda em \qty{10}{\second} & Voltas até parar & Robustez & $\theta_0$ máx. \\
+ & (solto a \qty{5}{\degree}) & & & & \\
+\midrule
+LQR + auto-ajuste & \qty{\vCmpLqrPico}{\rpm} & \qty{\vCmpLqrRoda}{\rpm} & \num{\vCmpLqrVoltas} & \vCmpLqrRob/\vNvariacoes & \qty{\vCmpLqrMax}{\degree} \\
+LQI & \qty{\vCmpLqiPico}{\rpm} & \qty{\vCmpLqiRoda}{\rpm} & \num{\vCmpLqiVoltas} & \vCmpLqiRob/\vNvariacoes & \qty{\vCmpLqiMax}{\degree} \\
+PID + malha da roda & \qty{\vCmpPidPico}{\rpm} & \qty{\vCmpPidRoda}{\rpm} & \num{\vCmpPidVoltas} & \vCmpPidRob/\vNvariacoes & \qty{\vCmpPidMax}{\degree} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{comparacao_leis.png}
+\caption{Acima: com o MPU6050 \qty{2}{\degree} torto, a rotação da roda depois de soltar o braço
+na vertical. Abaixo: resposta a um peteleco de \qty{2}{\radian\per\second}.}
+\label{fig:leis}
+\end{figure}
+
+O LQI é o que para a roda mais rápido, porque o ângulo da roda é um estado da própria lei
+ótima; o LQR com auto-ajuste é o mais suave depois de um peteleco, porque não tenta devolver a
+roda à posição de partida; o PID precisa da malha externa e, mesmo com ela, fica entre os dois.
+A inclinação máxima recuperável é praticamente a mesma nas três, porque quem a limita é o torque
+do motor, não a lei.
+
+% =====================================================================
 \section{Projeto mecânico}
 \label{sec:mecanica}
 
@@ -671,9 +787,10 @@ MPU6050 (GY-521) & ângulo e velocidade angular do braço, por I2C \\
 2 sensores ópticos de fenda (LM393) & encoder em quadratura da roda, \vRodaCpr{} contagens por volta \\
 Ponte H BTS7960 (IBT-2) & aciona o motor nos dois sentidos, até \qty{43}{\ampere} \\
 Motor CC 775, \qty{12}{\volt} & atuador; \qty{\vMotorNzero}{\rpm} em vazio (estimado) \\
-Fonte \qty{12}{\volt}, \qty{10}{\ampere} + conversor buck \qty{5}{\volt} & potência do motor e da lógica \\
-Fusível \qty{10}{\ampere}, TVS e capacitores & proteção do barramento \\
-ST-Link V2 e adaptador USB-serial \qty{3,3}{\volt} & gravação, depuração e telemetria \\
+Fonte chaveada \qty{12}{\volt}, \qty{10}{\ampere} & potência do motor; a proteção contra curto da fonte protege os fios \\
+2×\qty{4700}{\micro\farad} e \qty{100}{\nano\farad} & absorvem a energia devolvida pelo motor na frenagem \\
+Notebook (USB-C da Black Pill) & alimenta a lógica e recebe a telemetria \\
+ST-Link V2 & gravação e depuração (a telemetria vai pelo USB-C da placa) \\
 Rolamentos 608-ZZ, barra de aço \qty{8}{\milli\metre}, colares SCC8 & pivô \\
 \bottomrule
 \end{tabularx}
@@ -687,32 +804,41 @@ Rolamentos 608-ZZ, barra de aço \qty{8}{\milli\metre}, colares SCC8 & pivô \\
   bloco/.style={draw, rounded corners=2pt, align=center, minimum height=9mm, font=\small, fill=white},
   seta/.style={-{Latex[length=2.2mm]}, thick},
   node distance=6mm and 9mm]
-  \node[bloco] (f) {Fonte\\\qty{12}{\volt}};
-  \node[bloco, right=of f] (fu) {Fusível\\\qty{10}{\ampere}};
-  \node[bloco, right=of fu] (ibt) {IBT-2\\B+ / B$-$};
+  \node[bloco] (f) {Fonte chaveada\\\qty{12}{\volt}, \qty{10}{\ampere}};
+  \node[bloco, right=26mm of f] (ibt) {IBT-2\\B+ / B$-$};
   \node[bloco, right=of ibt] (m) {Motor\\775};
-  \node[bloco, below=of fu, xshift=14mm] (bk) {Buck\\\qty{5,0}{\volt}};
-  \node[bloco, right=of bk, fill=blue!6] (bp) {Black Pill\\pino 5V};
-  \node[bloco, above=of ibt, xshift=5mm, font=\scriptsize] (cap) {2×\qty{4700}{\micro\farad} + \qty{100}{\nano\farad}\\+ TVS SMBJ15A};
-  \node[bloco, above=of fu, xshift=-10mm, font=\scriptsize] (div) {divisor \qty{10}{\kilo\ohm} / \qty{2,2}{\kilo\ohm}\\$\to$ PA4 (tensão)};
-  \draw[seta] (f) -- (fu);
-  \draw[seta] (fu) -- (ibt);
+  \node[bloco, above=of ibt, font=\scriptsize] (cap) {2×\qty{4700}{\micro\farad}\\+ \qty{100}{\nano\farad}};
+  \node[bloco, above=of f, font=\scriptsize] (div) {divisor \qty{10}{\kilo\ohm} / \qty{2,2}{\kilo\ohm}\\$\to$ PA4 (tensão)};
+  \node[bloco, below=10mm of f] (nb) {Notebook\\USB-C};
+  \node[bloco, right=24mm of nb, fill=blue!6] (bp) {Black Pill\\regulador \qty{3,3}{\volt}};
+  \node[bloco, right=16mm of bp, font=\scriptsize] (log) {MPU6050, sensores\\e lógica do IBT-2};
+  \node[bloco, below=of bp, font=\scriptsize] (st) {ST-Link V2\\GND, SWDIO, SWCLK};
+  \draw[seta] (f) -- node[below, font=\scriptsize]{14 AWG} (ibt);
   \draw[seta] (ibt) -- (m);
-  \draw[seta] (fu.south) |- (bk.west);
-  \draw[seta] (bk) -- (bp);
-  \draw[thick] (cap.south) -- (cap.south |- ibt.north);
-  \draw[seta] ($(fu.east)!0.5!(ibt.west)$) |- (div.east);
+  \draw[thick] (cap) -- (ibt);
+  \draw[seta] ($(f.east)!0.5!(ibt.west)$) |- (div.east);
+  \draw[seta, <->] (nb) -- node[above, font=\scriptsize]{\qty{5}{\volt} + dados} (bp);
+  \draw[seta] (bp) -- node[above, font=\scriptsize]{\qty{3,3}{\volt}} (log);
+  \draw[seta] (st) -- (bp);
 \end{tikzpicture}
-\caption{Distribuição de energia. O divisor mede a tensão que chega à ponte: se ela cair (fonte
-fraca ou mau contato), o firmware entra em falha.}
+\caption{Distribuição de energia. Os \qty{12}{\volt} vão da fonte direto à ponte; a lógica vive do
+USB-C do notebook. O divisor mede a tensão que chega à ponte: abaixo de \qty{9}{\volt} ou acima de
+\qty{16,5}{\volt}, o firmware entra em falha e para o motor.}
 \label{fig:alimentacao}
 \end{figure}
 
 Toda a lógica opera em \qty{3,3}{\volt}: MPU6050, sensores ópticos e a entrada lógica do IBT-2
 (cujo limiar máximo é \qty{2,15}{\volt}) são alimentados pelo regulador da Black Pill, sem
-conversores de nível. O pino de \qty{5}{\volt} da placa é ligado direto ao conector USB, sem
-proteção; por isso a gravação é feita pelo ST-Link e a telemetria por um adaptador serial,
-e o USB da placa nunca é usado com o conversor buck ligado.
+conversores de nível. A placa recebe \qty{5}{\volt} do USB-C do notebook, o mesmo cabo que leva a
+telemetria e os comandos pela porta serial virtual; nada externo entra no pino de \qty{5}{\volt},
+que é ligado direto ao conector USB. O firmware é gravado pelo ST-Link, ligado só por GND, SWDIO e
+SWCLK enquanto o USB-C estiver conectado.
+
+A parte de potência foi reduzida ao mínimo: a fonte chaveada vai direto aos bornes do IBT-2 por fio
+de \qty{14}{AWG}, e a proteção contra curto da própria fonte faz o papel do fusível. Os dois
+eletrolíticos de \qty{4700}{\micro\farad}, soldados a até \qty{5}{\centi\metre} dos bornes,
+absorvem a energia que o motor devolve quando freia; se mesmo assim a tensão passar de
+\qty{16,5}{\volt}, o firmware entra em falha 5 (sobretensão) e para o motor.
 
 \subsection{Pinagem}
 
@@ -737,7 +863,9 @@ O modelo deduzido por Euler-Lagrange descreve o pêndulo com roda de reação co
 acopladas, nas quais o torque do motor aparece só na coordenada da roda e o braço o sente como
 reação. Linearizado em torno do equilíbrio e escrito em variáveis de erro, o sistema é instável
 mas controlável, e o LQR discreto a \qty{\vFs}{\hertz} o estabiliza com polos bem amortecidos,
-recuperando o braço de até \qty{\vThetaMax}{\degree} com os limites reais de tensão e corrente.
+recuperando o braço de até \qty{\vThetaMax}{\degree} com os limites reais de tensão e corrente. O
+mesmo modelo aumentado com o ângulo da roda dá o LQI, e a alocação de polos dá um PID com malha
+externa na roda; as três leis estão no firmware e se trocam pela serial (Seção~\ref{sec:leis}).
 
 Os parâmetros do motor ainda são estimativas: o anúncio do motor 775 informa só a faixa de
 rotação. Os próximos passos são:
