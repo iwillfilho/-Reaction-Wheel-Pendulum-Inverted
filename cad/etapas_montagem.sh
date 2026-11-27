@@ -74,3 +74,5 @@ for f in sorted(Path(sys.argv[1]).glob("*.png")):
         m = 16
         img.crop((max(0, l - m), max(0, t - m), min(img.width, r + m), min(img.height, b + m))).save(f)
 EOF
+
+echo "Para atualizar a página HTML do projeto: python -m tools.gerar_visualizacao"

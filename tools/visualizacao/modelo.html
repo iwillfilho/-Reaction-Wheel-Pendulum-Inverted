@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pêndulo com roda de reação: montagem física e ligações</title>
+<!-- Gerado por tools/gerar_visualizacao.py. Não edite à mão: rode o gerador de novo. -->
+<style>/*ESTILO*/</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca">
+    <div class="titulo">Pêndulo com roda de reação</div>
+    <div class="sub">WeAct Black Pill STM32F411 · motor 775 · ponte H IBT-2</div>
+  </div>
+  <nav class="abas" role="tablist">
+    <button role="tab" data-aba="aba-3d" class="ativa">3D e fiação</button>
+    <button role="tab" data-aba="aba-montagem">Montagem física</button>
+    <button role="tab" data-aba="aba-ligacoes">Ligações elétricas</button>
+  </nav>
+  <div class="versao" id="versao"></div>
+</header>
+
+<main>
+  <!-- ================================================================ 3D -->
+  <section id="aba-3d" class="aba ativa">
+    <div class="palco">
+      <div id="cena"></div>
+      <div id="dica" class="dica3d"></div>
+      <div id="faixa-tarefa" class="faixa-tarefa" hidden>
+        <span id="faixa-texto"></span>
+        <button id="faixa-ir">ver a tarefa</button>
+        <button id="faixa-limpar" title="limpar destaque">×</button>
+      </div>
+      <div class="ajuda3d">arraste para girar · botão direito para mover · roda do mouse para aproximar · clique numa peça ou num fio</div>
+    </div>
+    <aside class="painel">
+      <div class="bloco">
+        <div class="rotulo">Vista</div>
+        <div class="botoes" id="vistas">
+          <button data-vista="iso">Iso (trás)</button>
+          <button data-vista="frente">Frente</button>
+          <button data-vista="tras">Trás</button>
+          <button data-vista="lado">Lado</button>
+          <button data-vista="cima">Cima</button>
+        </div>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Etapa da montagem <span id="etapa-num" class="valor"></span></div>
+        <input type="range" id="etapa" min="1" max="9" step="1" value="9">
+        <div id="etapa-nome" class="nota"></div>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Inclinação do braço <span id="incl-val" class="valor">0°</span></div>
+        <input type="range" id="incl" min="-25" max="25" step="0.5" value="0">
+        <label class="chk"><input type="checkbox" id="balancar"> balançar de batente a batente</label>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Roda <span id="giro-val" class="valor">0°</span></div>
+        <input type="range" id="giro" min="0" max="360" step="1" value="0">
+        <label class="chk"><input type="checkbox" id="girar"> girar</label>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Vista explodida <span id="exp-val" class="valor">0 %</span></div>
+        <input type="range" id="explodir" min="0" max="1" step="0.01" value="0">
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Mostrar</div>
+        <label class="chk"><input type="checkbox" data-camada="impressas" checked> peças impressas</label>
+        <label class="chk"><input type="checkbox" data-camada="compradas" checked> peças compradas</label>
+        <label class="chk"><input type="checkbox" data-camada="protecao" checked> proteção de policarbonato</label>
+        <label class="chk"><input type="checkbox" data-camada="eletronica" checked> eletrônica e fonte</label>
+        <label class="chk"><input type="checkbox" data-camada="fios" checked> fios</label>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Redes (passe o mouse; clique fixa)</div>
+        <ul class="redes" id="redes3d"></ul>
+      </div>
+      <div class="bloco">
+        <div class="rotulo">Números do projeto (simulação)</div>
+        <table class="resumo" id="resumo"></table>
+      </div>
+      <div class="bloco info" id="info">
+        <div class="rotulo">Seleção</div>
+        <div id="info-corpo" class="nota">Clique numa peça ou num fio.</div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ========================================================== montagem -->
+  <section id="aba-montagem" class="aba">
+    <nav class="indice" id="indice"></nav>
+    <div class="guia" id="guia">
+      <section class="secao" id="mapa">
+        <h2>Mapa das tarefas</h2>
+        <p class="nota">Duas trilhas em paralelo (mecânica e elétrica) que se encontram na integração.
+          As setas dizem o que precisa estar pronto antes. Clique numa tarefa para abrir os passos;
+          passe o mouse para ver de quem ela depende. Os quadrados de “aceite” ficam marcados neste
+          navegador.</p>
+        <div id="fluxo"></div>
+        <div class="progresso" id="progresso"></div>
+      </section>
+<!--GUIA-->
+    </div>
+  </section>
+
+  <!-- ========================================================== ligações -->
+  <section id="aba-ligacoes" class="aba">
+    <div class="lig">
+      <div class="lig-esq">
+        <h2>Esquema de ligações</h2>
+        <p class="nota">Passe o mouse num fio, numa rede da legenda ou numa linha da tabela para
+          destacar a rede. Clique para vê-la no 3D. Fonte da verdade da pinagem:
+          <code>firmware/include/board.h</code>, conferida contra <code>docs/ligacoes.md</code> pelos testes.</p>
+        <div id="esquema"></div>
+        <ul class="redes horizontal" id="redes-esq"></ul>
+      </div>
+      <div class="lig-dir">
+        <div class="caixa atencao"><div class="caixa-tit">Regras de ouro</div><ol id="regras"></ol></div>
+        <h3>Pinagem da Black Pill</h3>
+        <div class="tabela" id="tab-pinagem"></div>
+        <h3>Alimentação dos módulos</h3>
+        <div class="tabela" id="tab-modulos"></div>
+        <h3>LED da placa (PC13)</h3>
+        <div class="tabela" id="tab-led"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>/*THREE*/</script>
+<script>
+/*DADOS*/
+</script>
+<script>
+/*CENA3D*/
+</script>
+<script>
+/*PAGINA*/
+</script>
+</body>
+</html>

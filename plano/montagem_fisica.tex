@@ -250,7 +250,7 @@ figura~\ref{fig:fluxo}. Com 5 pessoas, a montagem toma \textbf{cerca de um dia d
   \node[m] (m1) {\textbf{M1} inspeção e encaixe \hfill 40 min};
   \node[m, below=of m1] (m2) {\textbf{M2} pesar e medir \hfill 50 min};
   \node[m, below=of m2] (m4) {\textbf{M4} insertos térmicos \hfill 30 min};
-  \node[m, below=of m4] (m6) {\textbf{M6} braço, motor e flange \hfill 50 min};
+  \node[m, below=of m4] (m6) {\textbf{M6} braço, motor e flange \hfill 60 min};
   \node[m, below=of m6] (m7) {\textbf{M7} roda e balanceamento \hfill 50 min};
   \node[m, below=of m7] (m8) {\textbf{M8} sensores e MPU6050 \hfill 45 min};
   \node[m, below=of m8] (m10) {\textbf{M10} pivô: braço na base \hfill 30 min};
@@ -690,49 +690,141 @@ o IBT-2.}
 entre os terminais e a carcaça (capacitor aparece como circuito aberto).
 \end{tarefa}
 
-\begin{tarefa}{M6}{Braço: rolamentos, motor e flange}{1}{50 min}{M4 e M5}
+\begin{tarefa}{M6}{Braço: rolamentos, motor e flange}{1}{60 min}{M4 e M5}
 \objetivo{montar no braço os dois rolamentos do pivô, o motor e o flange que vai segurar a
-roda.}
-\textbf{Material:} braço com insertos, 2 rolamentos 608-ZZ, motor com chicote, 2 parafusos
-M4 $\times$ 8, flange, trava-rosca, morsa com mordente macio, balança, broca de 2~mm.
+roda. No fim, o braço é uma peça única e rígida: gira livre no pivô, e o motor não se mexe
+nem um décimo de milímetro em relação a ele.}
+\textbf{Material:} braço com insertos, 2 rolamentos 608-ZZ, motor com chicote (M5), 2
+parafusos M4 $\times$ 8, chave do M4, flange, trava-rosca médio (azul, removível), morsa com
+mordente macio, balança, broca de 2~mm, estilete, a barra de 8~mm. Opcional: 2 arruelas lisas
+M4.
+
+\textbf{Por que nesta ordem:} os rolamentos vão primeiro porque a morsa precisa do braço sem
+nada pendurado; o braço é pesado \emph{antes} do motor porque o modelo usa a massa dele
+sozinho (\cmd{m_braco}); o flange vai por último porque o calço de 2~mm se apoia no ressalto
+do motor.
 \figpasso{exp_braco}{5.6cm}{Vista explodida do braço: um rolamento entra pela frente e o outro
   por trás; o motor encaixa por trás; os 2 parafusos M4 entram pela frente; o flange vai no
   eixo, pela frente.}
+
+\textbf{Parte 1: rolamentos do pivô.} A \textbf{frente} do braço é a face lisa que ficou na
+mesa da impressora (a roda fica deste lado); o tubo dos rolamentos sai para \textbf{trás}.
+Cada ponta do tubo tem um assento de 22~mm para um 608 ($22 \times 8 \times 7$~mm). Entre os
+dois assentos o furo estreita para 15~mm: esse degrau é o batente, e ele toca só o anel
+externo do rolamento.
 \begin{passos}
-  \item \textbf{Rolamentos}: encaixe um no assento da frente do tubo (a face do braço que
-    ficou na mesa da impressora) e o outro no assento de trás.
-    \begin{itemize}
-      \item justos: prense na morsa com mordente macio, empurrando \textbf{só o anel
-        externo} (um soquete do tamanho do anel externo ajuda);
-      \item folgados: uma gota de cola no anel externo, \textbf{nunca} no interno.
-    \end{itemize}
-  \item \textbf{Pese o braço} com os rolamentos e os insertos, \emph{antes} do motor, e anote
-    na tabela~\ref{tab:medidas} (\cmd{m_braco}).
-  \item \textbf{Motor}: encaixe a carcaça no rebaixo de trás do braço, com os terminais
-    virados para o lado em que o chicote vai descer (figura~\ref{fig:chicotes}). Prenda
-    com os 2 parafusos \textbf{M4 $\times$ 8}, colocados pela frente do braço. Não use
-    parafusos mais compridos: eles tocam o enrolamento do motor.
-  \item \textbf{Flange} (figura~\ref{fig:flange}):
-    \begin{passos}
-      \item enfie o flange no eixo, com o cubo virado para o motor e o disco para fora;
-      \item ponha a broca de 2~mm atravessada entre o ressalto do motor e o cubo, como calço,
-        e encoste o flange nela (o \cmd{folgas.py} prevê 1,9~mm);
-      \item gire o flange até um dos parafusos de trava ficar em cima do \textbf{lado plano}
-        do eixo;
-      \item uma gota de trava-rosca em cada parafuso de trava, aperte primeiro o do lado
-        plano, depois o outro, e tire a broca.
-    \end{passos}
-  \item Espere \textbf{30~min} antes de girar o motor com a roda (cura do trava-rosca).
+  \item Rolamento da frente: entra pela face da frente até parar no batente. Pronto, ele fica
+    rente à face.
+  \item Rolamento de trás: entra pela ponta de trás do tubo até parar no batente; fica rente
+    à ponta do tubo.
+  \item Se estiverem \textbf{justos}: prense na morsa com mordente macio, empurrando
+    \textbf{só o anel externo} (um soquete do tamanho do anel externo ajuda). Nunca martele
+    e nunca empurre o anel interno: a força passa pelas esferas, marca as pistas e o
+    rolamento passa a ``arranhar'' ao girar, o que o controle sente como atrito.
+  \item Se estiverem \textbf{folgados}: uma gota de cola no anel externo, \textbf{nunca} no
+    interno, sem deixar escorrer para a blindagem.
+  \item Teste: passe a barra de 8~mm pelos dois rolamentos. Ela entra sem forçar e o braço
+    gira livre em volta dela, sem pontos duros. Se a barra precisar ``achar'' o segundo
+    rolamento, um deles entrou torto: tire e prense de novo.
 \end{passos}
+
+\textbf{Parte 2: pesar.} Pese o braço com os 2 rolamentos e os insertos, \emph{sem} motor,
+flange nem parafusos M4, e anote na tabela~\ref{tab:medidas} (\cmd{m_braco}).
+
+\textbf{Parte 3: motor.} Antes de montar, entenda o que segura o motor
+(figura~\ref{fig:motorcorte}):
+\begin{itemize}
+  \item O rebaixo de trás do braço (4,5~mm de fundo, 0,5~mm maior que a carcaça) e o furo do
+    meio (onde passa o ressalto) só \textbf{centralizam} o motor. Eles não o seguram.
+  \item Quem \textbf{segura} são os 2 parafusos M4: atravessam a parede de 3,5~mm do braço
+    e entram 4,5~mm na rosca da tampa do motor, puxando a face do motor contra a parede.
+    Motor firme é motor com a face \textbf{encostada por inteiro} na parede e os 2 parafusos
+    apertados.
+  \item A carcaça (67~mm, uns 350~g) fica em balanço para trás. A cada aceleração da roda o
+    motor tenta girar no sentido contrário: é essa reação que equilibra o pêndulo, e quem a
+    segura são os 2 parafusos. Parafuso frouxo vira folga, e folga entre o motor e o braço
+    faz o controle oscilar.
+\end{itemize}
+\figil{\ilMotor}{Motor no braço, em corte pelos 2 parafusos M4. O rebaixo e o ressalto
+  centralizam; os parafusos puxam a face do motor contra a parede de 3,5~mm e é isso que o
+  segura.}{fig:motorcorte}
+\begin{passos}
+  \item \textbf{Limpe os encaixes.} Passe o estilete no canto do fundo do rebaixo e na borda
+    do furo do meio. Um fio de plástico ali impede a face de encostar na parede.
+  \item \textbf{Teste a seco, sem parafusos.} Encaixe a carcaça no rebaixo: ela entra com
+    leve pressão e o ressalto passa pelo furo do meio sem raspar. Olhe de lado contra a luz:
+    não pode haver fresta entre a face do motor e a parede.
+  \item \textbf{Escolha a posição.} Os 2 furos M4 do braço ficam numa linha atravessada (de
+    um lado do braço ao outro), a 29~mm um do outro. O motor só encaixa em duas posições,
+    girado de meia volta. Escolha a que deixa os terminais (na tampa de trás) virados para o
+    lado em que o chicote desce (figura~\ref{fig:chicotes}).
+  \item \textbf{Confira o comprimento.} Só \textbf{M4 $\times$ 8}: 3,5~mm ficam na parede e
+    4,5~mm entram no motor, o que dá 6 filetes de rosca, mais que suficiente. Um parafuso
+    mais comprido passa da tampa e encosta no enrolamento: o motor trava ou entra em curto.
+  \item \textbf{Rosqueie com a mão.} Com o motor no lugar, coloque os 2 parafusos pela frente
+    (com arruela, se tiver) e rosqueie só com os dedos. A cabeça tem que encostar no braço
+    \emph{antes} de o parafuso ficar duro. Se ele travar com a cabeça ainda afastada,
+    \textbf{pare}: o furo do motor é mais raso. Ponha uma arruela (tira 0,8~mm) e teste de
+    novo. Nunca force.
+  \item \textbf{Aperte em cruz.} Meia volta num, meia volta no outro, até os dois ficarem
+    firmes. Depois mais \textbf{1/4 de volta} em cada. Se o plástico em volta da cabeça
+    afundar ou ficar esbranquiçado, passou do ponto: volte 1/4 de volta.
+  \item \textbf{Trava-rosca.} Tire um parafuso por vez, ponha uma gota de trava-rosca médio
+    só na ponta da rosca (a parte que entra no motor, longe do plástico) e reaperte como
+    antes. A vibração da roda solta parafuso seco.
+  \item \textbf{Teste de firmeza.} Segure o braço e tente girar e balançar a carcaça com a
+    mão: nada mexe, nem um ``clique''. Gire o eixo com os dedos: ele gira tão leve quanto
+    antes. Se ficou duro, o motor está torto no encaixe: afrouxe, recentralize e aperte de
+    novo em cruz.
+\end{passos}
+O PETG cede um pouco sob pressão constante. Reaperte os 2 M4 depois do I4 (motor sem roda) e
+de novo antes do primeiro equilíbrio.
+
+\textbf{Parte 4: flange} (figura~\ref{fig:flange}). A posição do flange no eixo define onde a
+roda fica: os dentes do encoder precisam passar no meio da fenda dos sensores ópticos. Por
+isso a distância até o motor é medida com o calço, e não ``a olho''.
+\begin{passos}
+  \item Enfie o flange no eixo, com o cubo virado para o motor e o disco para fora.
+  \item Ponha a broca de 2~mm atravessada entre o ressalto do motor e o cubo, como calço, e
+    encoste o flange nela (o \cmd{folgas.py} prevê 1,9~mm). Sem essa folga o cubo raspa no
+    ressalto e freia o motor.
+  \item Gire o flange até um dos parafusos de trava ficar em cima do \textbf{lado plano} do
+    eixo. Apertado na parte redonda, ele escorrega com o torque da roda.
+  \item Uma gota de trava-rosca em cada parafuso de trava. Aperte primeiro o do lado plano,
+    depois o outro, e tire a broca.
+  \item Gire o eixo devagar olhando a borda do disco: ela não pode oscilar. Se oscilar, o
+    flange entrou torto: afrouxe e reaperte.
+\end{passos}
+Espere \textbf{30~min} antes de girar o motor com a roda (cura do trava-rosca).
 \figil{\ilFlange}{Flange no eixo, em corte: a broca de 2~mm marca a distância até o motor, e
   um parafuso de trava aperta o lado plano do eixo.}{fig:flange}
 \figdupla{etapa1_rolamentos}{etapa2_motor}{4.4cm}{como fica: rolamentos no tubo (frente)}%
   {motor no rebaixo (trás)}
 \figpasso{etapa3_flange}{4.4cm}{como fica: flange no eixo (frente)}
-\textbf{Aceite:} os rolamentos giram livres; o motor não balança; o flange não escorrega no
-eixo.\quad
-\textbf{Se falhar:} motor com folga no rebaixo \flecha{} uma volta de fita isolante na
-carcaça.
+\textbf{Aceite:}
+\begin{checklist}
+  \item a barra de 8~mm passa pelos dois rolamentos e o braço gira livre em volta dela;
+  \item \cmd{m_braco} anotado na tabela~\ref{tab:medidas};
+  \item face do motor encostada na parede, sem fresta; carcaça não mexe à mão; eixo gira
+    leve;
+  \item flange a \aprox{} 2~mm do ressalto, parafuso de trava no lado plano, disco sem
+    oscilar.
+\end{checklist}
+\textbf{Se falhar:}
+\begin{itemize}
+  \item motor com folga lateral no rebaixo \flecha{} uma volta de fita isolante na carcaça,
+    na parte que entra no rebaixo;
+  \item fresta entre a face do motor e a parede \flecha{} rebarba no rebaixo ou ressalto
+    raspando no furo do meio: limpe com o estilete. Nunca tente fechar a fresta apertando
+    mais;
+  \item parafuso trava antes de a cabeça encostar \flecha{} arruela M4. Nunca parafuso mais
+    comprido;
+  \item plástico trincado em volta de um parafuso \flecha{} arruela larga M4 (de
+    12~mm de diâmetro) por cima; se a trinca chegar ao furo do meio, reimprima o braço;
+  \item motor solto depois dos ensaios \flecha{} reaperte com trava-rosca novo;
+  \item eixo duro depois do aperto \flecha{} motor torto no encaixe: afrouxe, recentralize,
+    aperte em cruz.
+\end{itemize}
 \end{tarefa}
 
 \begin{tarefa}{M7}{Roda e balanceamento}{1}{50 min}{M6 (trava-rosca curado) e M2}

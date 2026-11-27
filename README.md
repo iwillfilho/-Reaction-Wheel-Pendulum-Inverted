@@ -43,6 +43,7 @@ python cad/folgas.py          # confere ~40 folgas e interferências do CAD
 python -m sim.animacao --renderizar   # simulação animada no OpenSCAD -> cad/previews/simulacao.gif
 openscad cad/simulacao.scad   # a mesma animação no OpenSCAD: View > Animate, FPS 25, Steps 140
 python -m sim.export_relatorio && (cd relatorio && latexmk -pdf relatorio.tex)   # relatório em PDF
+python -m tools.gerar_visualizacao   # plano/visualizacao_projeto.html: 3D, montagem e ligações
 ```
 
 Instalação das ferramentas: `pipx install platformio` e `sudo apt install openscad`.
@@ -95,6 +96,11 @@ informa "3000–5000 rpm"); os ganhos finais saem depois da identificação na b
 - [docs/testes_bancada.md](docs/testes_bancada.md): 8 etapas do primeiro LED ao relatório.
 - [plano/montagem_fisica.pdf](plano/montagem_fisica.pdf): guia passo a passo da montagem física,
   das peças em mãos ao pêndulo ligado e conferido (figuras: `./cad/etapas_montagem.sh`).
+- [plano/visualizacao_projeto.html](plano/visualizacao_projeto.html): o projeto inteiro numa página
+  que abre sem internet: o pêndulo em 3D com os fios (inclina, gira a roda, explode, mostra cada
+  etapa e cada tarefa), o guia de montagem com as caixas de aceite marcáveis e o esquema de
+  ligações interativo. Gerada por `python -m tools.gerar_visualizacao` (OpenSCAD, pdflatex e
+  poppler-utils); rode de novo depois de mudar o CAD, o guia ou as ligações.
 
 ## Licença
 

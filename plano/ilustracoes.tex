@@ -164,6 +164,58 @@
 \end{tikzpicture}}
 
 % ---------------------------------------------------------------------
+% Motor no braço, em corte pelos 2 parafusos M4 (trás à esquerda, frente à direita)
+\newcommand{\ilMotor}{%
+\begin{tikzpicture}[il, x=1.5mm, y=1.5mm]
+  % carcaça do motor (cortada: continua para a esquerda)
+  \fill[black!25] (-30,-22.25) rectangle (-3.5,22.25);
+  \draw[black!50, dashed] (-30,-22.25) -- (-30,22.25);
+  \fill[orange!45, draw=orange!60!black] (-27,-15) rectangle (-11,15);
+  \node[rot] at (-19,0) {enrolamento};
+  \node[rot] at (-19,18.6) {motor 775};
+  % furos roscados M4 na tampa da frente do motor
+  \foreach \s in {-1,1} \fill[black!45] (-9.5,\s*14.5-2) rectangle (-3.5,\s*14.5+2);
+  % braço: placa cheia fora do rebaixo e parede da frente com os furos
+  \fill[peca] (-8,22.5) rectangle (0,28.5);
+  \fill[peca] (-8,-28.5) rectangle (0,-22.5);
+  \foreach \s in {-1,1} {
+    \fill[peca] (-3.5,\s*9.05) rectangle (0,\s*12.3);
+    \fill[peca] (-3.5,\s*16.7) rectangle (0,\s*22.5);
+  }
+  % ressalto e eixo
+  \fill[black!40] (-3.5,-8.75) rectangle (1.1,8.75);
+  \fill[black!30, draw=black!60] (1.1,-2.5) rectangle (10,2.5);
+  \node[above] at (6.5,2.5) {eixo};
+  % parafusos M4 x 8: cabeça na frente, 3,5 mm na parede, 4,5 mm no motor
+  \foreach \s in {-1,1} {
+    \fill[black!75] (-8,\s*14.5-2) rectangle (0,\s*14.5+2);
+    \fill[black!75] (0,\s*14.5-3.5) rectangle (3,\s*14.5+3.5);
+  }
+  % cotas do braço
+  \draw[guia] (-8,28.5) -- (-8,35.5);
+  \draw[guia] (-3.5,28.5) -- (-3.5,35.5);
+  \draw[guia] (0,28.5) -- (0,35.5);
+  \draw[cota] (-8,33) -- (-3.5,33);
+  \draw[cota] (-3.5,33) -- (0,33);
+  \node[above] at (-5.75,33.4) {4,5};
+  \node[above] at (-1.75,33.4) {3,5};
+  \node[left, align=right] at (-8.6,33) {rebaixo (só centra)\\e parede do braço, em mm};
+  % rosca dentro do motor
+  \draw[cota] (-8,-10.6) -- (-3.5,-10.6);
+  \draw[guia] (-5.75,-10.6) -- (-19,-25.5) node[below, align=center] {4,5~mm de rosca no\\motor: o que segura};
+  \draw[guia] (-20,-12) -- (-36,-12) node[left, align=right] {parafuso maior\\que 8~mm\\encosta aqui};
+  % aperto
+  \draw[seta] (-27,25) -- (-13,25);
+  \node[above, align=center] at (-20,25.6) {o aperto puxa a face\\do motor contra a parede};
+  % rótulos da frente
+  \draw[guia] (3,16) -- (14,19) node[right] {M4~$\times$~8, entra pela frente};
+  \draw[guia] (0.5,-7) -- (14,-8) node[right, align=left] {ressalto: centra o motor\\no furo do meio};
+  \draw[guia] (-3.5,-20) -- (14,-22) node[right, align=left] {face do motor encostada\\na parede, sem fresta};
+  \node[rot] at (-19,-34) {$\leftarrow$ trás};
+  \node[rot] at (6,-34) {frente (roda) $\rightarrow$};
+\end{tikzpicture}}
+
+% ---------------------------------------------------------------------
 % Pivô em corte: ordem das peças na barra e o calço de papel
 \newcommand{\ilPivo}{%
 \begin{tikzpicture}[il, x=1.45mm, y=1.45mm]
